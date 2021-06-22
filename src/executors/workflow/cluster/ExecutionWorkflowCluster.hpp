@@ -550,6 +550,7 @@ namespace ExecutionWorkflow {
 		assert(source != nullptr);
 		nanos6_device_t sourceType = source->getType();
 		assert(target == ClusterManager::getCurrentMemoryNode());
+		ConfigVariable<std::string> commType("cluster.communication");
 
 		//! Currently, we cannot have a cluster data copy where the source
 		//! location is in the Directory. This would mean that the data
@@ -565,7 +566,12 @@ namespace ExecutionWorkflow {
 		DataAccessObjectType objectType = access->getObjectType();
 		DataAccessType type = access->getType();
 		DataAccessRegion region = access->getAccessRegion();
-		bool isDistributedRegion = VirtualMemoryManagement::isDistributedRegion(region);
+		bool isArgoRegion = false;
+		if(commType.getValue() == "argodsm"){
+			isArgoRegion = argo::is_argo_address(region.getStartAddress());
+		}
+		bool isDistributedRegion = VirtualMemoryManagement::isDistributedRegion(region) ||
+			isArgoRegion;
 
 		//! The source device is a host MemoryPlace of the current
 		//! ClusterNode. We do not really need to perform a
@@ -615,7 +621,6 @@ namespace ExecutionWorkflow {
 		if (needsTransfer) {
 			/* If the memory address belongs to ArgoDSM memory space,
 			 * perform an Argo step instead of a Nanos6 step */
-			ConfigVariable<std::string> commType("cluster.communication");
 			if(commType.getValue() == "argodsm"){
 				if (argo::is_argo_address(region.getStartAddress())) {
 					return new ArgoAcquireStep(source, target, region);

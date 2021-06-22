@@ -23,6 +23,17 @@ private:
 		return location->getIndex();
 	}
 
+	size_t next_node{0};
+	std::mutex ft_mutex;
+
+	size_t getNextFtNode(){
+		std::lock_guard<std::mutex> lock(ft_mutex);
+		size_t ret_val = next_node;
+		next_node = (next_node+1) % nanos6_get_num_cluster_nodes();
+		return ret_val;
+	}
+
+
 public:
 	ClusterLocalityScheduler(ClusterSchedulerInterface * const interface)
 		: ClusterSchedulerInterface::ClusterSchedulerPolicy("ClusterLocalityScheduler", interface)

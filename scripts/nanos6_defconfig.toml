@@ -274,6 +274,11 @@ __require_CLUSTER
 	# Size of the ArgoDSM page cache. This is located in DRAM on each node and the size
 	# should be set accordingly. The default is equal to distributed_memory.
 	cache_size = "1G"
+	# Tuning knob for locality scheduler under first-touch allocation for when to
+	# offload tasks to a random node versus when to offload to the node with the most
+	# local data. The default is 2.0, for which a task with twice as much dependency
+	# data not yet first-touched as data first-touched residing on any one node
+	locality_tuning = 2.0
 
 __!require_CLUSTER
 

@@ -30,9 +30,10 @@ void ConfigCentral::initialize()
 	registerOption<size_t>("cluster.message_max_size", std::numeric_limits<int>::max());
 
 
-	// Argo
+	// ArgoDSM
 	registerOption<memory_t>("argodsm.distributed_memory", 1UL << 30);
 	registerOption<memory_t>("argodsm.cache_size", 1UL << 30);
+	registerOption<float_t>("argodsm.locality_tuning", 2.0);
 
 	// CPU manager
 	registerOption<string_t>("cpumanager.policy", "default");

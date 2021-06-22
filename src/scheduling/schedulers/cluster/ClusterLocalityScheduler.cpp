@@ -6,6 +6,8 @@
 
 #include <vector>
 #include <cmath>
+#include <numeric>
+#include <algorithm>
 
 #include "ClusterLocalityScheduler.hpp"
 #include "memory/directory/Directory.hpp"
@@ -27,6 +29,7 @@ int ClusterLocalityScheduler::getScheduledNode(
 	const size_t clusterSize = ClusterManager::clusterSize();
 
 	std::vector<size_t> bytes(clusterSize, 0);
+	std::size_t ft_bytes = 0;
 	bool canBeOffloaded = true;
 
 	DataAccessRegistration::processAllDataAccesses(
@@ -49,27 +52,29 @@ int ClusterLocalityScheduler::getScheduledNode(
 				const Directory::HomeNodesArray *homeNodes = Directory::find(region);
 
 				for (const auto &entry : *homeNodes) {
-					location = entry->getHomeNode();
 					DataAccessRegion subregion = region.intersect(entry->getAccessRegion());
-					size_t nodeId = 0;
 					//! If the subregion is in argo memory
 					if (argo::is_argo_address(subregion.getStartAddress())) {
 						char* startAddress = static_cast<char*>(subregion.getStartAddress());
-						int chunks = 0;
-						size_t chunk_size = argo::get_block_size();
+						char* endAddress = startAddress + subregion.getSize();
+						size_t block_size = argo::get_block_size();
 						for(char* addr = startAddress;
-								addr < startAddress+subregion.getSize();
-								addr += chunk_size) {
-							nodeId += static_cast<size_t>(
-									argo::get_homenode(static_cast<void*>(addr)));
-							chunks++;
+								addr < endAddress;
+								addr += block_size) {
+							int homenode = argo::get_homenode(addr);
+							if(homenode < 0) {
+								//! Chunk has not been first-touched
+								ft_bytes += (addr+block_size < endAddress) ?
+									block_size : endAddress - addr;
+							} else {
+								//! Chunk is backed on one node
+								bytes[homenode] += (addr+block_size < endAddress) ?
+									block_size : endAddress - addr;
+							}
 						}
-						assert(chunks>0);
-						size_t avg_nodeId = std::lround(
-								static_cast<double>(nodeId)/static_cast<double>(chunks));
-						bytes[avg_nodeId] += subregion.getSize();
 					} else {
-						nodeId = getNodeIdForLocation(location);
+						location = entry->getHomeNode();
+						size_t nodeId = getNodeIdForLocation(location);
 
 						bytes[nodeId] += subregion.getSize();
 					}
@@ -77,24 +82,26 @@ int ClusterLocalityScheduler::getScheduledNode(
 
 				delete homeNodes;
 			} else {
-				size_t nodeId = 0;
 				if (argo::is_argo_address(region.getStartAddress())) {
 					char* startAddress = static_cast<char*>(region.getStartAddress());
-					int chunks = 0;
-					size_t chunk_size = argo::get_block_size();
+					char* endAddress = startAddress + region.getSize();
+					size_t block_size = argo::get_block_size();
 					for(char* addr = startAddress;
-							addr < startAddress+region.getSize();
-							addr += chunk_size) {
-						nodeId += static_cast<size_t>(
-								argo::get_homenode(static_cast<void*>(addr)));
-						chunks++;
+							addr < endAddress;
+							addr += block_size) {
+						int homenode = argo::get_homenode(addr);
+						if(homenode < 0) {
+							//! Chunk has not been first-touched
+							ft_bytes += (addr+block_size < endAddress) ?
+								block_size : endAddress - addr;
+						} else {
+							//! Chunk is backed on one node
+							bytes[homenode] += (addr+block_size < endAddress) ?
+								block_size : endAddress - addr;
+						}
 					}
-					assert(chunks>0);
-					size_t avg_nodeId =
-						std::lround(static_cast<double>(nodeId)/static_cast<double>(chunks));
-					bytes[avg_nodeId] += region.getSize();
 				} else {
-					nodeId = getNodeIdForLocation(location);
+					size_t nodeId = getNodeIdForLocation(location);
 
 					bytes[nodeId] += region.getSize();
 				}
@@ -108,9 +115,29 @@ int ClusterLocalityScheduler::getScheduledNode(
 		return nanos6_cluster_no_offload;
 	}
 
+	size_t nodeId;
+
+	// Get the maximum number of bytes backed by any one node
 	assert(!bytes.empty());
-	std::vector<size_t>::iterator it = bytes.begin();
-	const size_t nodeId = std::distance(it, std::max_element(it, it + clusterSize));
+	const size_t max_bytes = *std::max_element(bytes.begin(), bytes.end());
+
+	ConfigVariable<double> locality_tuning_var("argodsm.locality_tuning");
+	double locality_tuning = locality_tuning_var.getValue();
+
+	// If the number of bytes that are not first-touched exceed the
+	// threshold of bytes located on any one node multiplied by the
+	// locality tuning paremeter, we pick a random node to offload the
+	// task to. This is meant to happen when the number of bytes still
+	// to first-touch is significant compared to the number of bytes
+	// owned by any other node. Otherwise, we offload to the node
+	// holding the largest number of dependency bytes.
+	if(ft_bytes > locality_tuning*max_bytes) {
+		nodeId = getNextFtNode();
+	} else {
+		std::vector<size_t>::iterator it = bytes.begin();
+		// TODO: Should we pick getNextFtNode() if all distances are equal?
+		nodeId = std::distance(it, std::max_element(it, it + clusterSize));
+	}
 
 	return nodeId;
 }
