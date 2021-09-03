@@ -311,6 +311,9 @@ namespace ExecutionWorkflow {
 
 		//! The DataAccessRegion corresponding to this data release
 		DataAccessRegion _region;
+		
+		bool _simpleDependencies;
+		bool _simpleAcquireDone;
 
 	public:
 		ArgoAcquireStep(
@@ -322,6 +325,9 @@ namespace ExecutionWorkflow {
 			_targetMemoryPlace(targetMemoryPlace),
 			_region(region)
 		{
+			ConfigVariable<bool> simpleDependencies("argodsm.simple_dependencies");
+			_simpleDependencies = simpleDependencies;
+			_simpleAcquireDone = false;
 		}
 
 		void start();
@@ -329,6 +335,8 @@ namespace ExecutionWorkflow {
 
 	class ArgoReleaseStepLocal : public DataReleaseStep {
 		//DataAccess *_dataAccess;
+		bool _simpleDependencies;
+		bool _simpleReleaseDone;
 
 		public:
 			ArgoReleaseStepLocal(
@@ -336,6 +344,9 @@ namespace ExecutionWorkflow {
 					) : DataReleaseStep(task)
 			{
 				task->setDataReleaseStep(this);
+				ConfigVariable<bool> simpleDependencies("argodsm.simple_dependencies");
+				_simpleDependencies = simpleDependencies;
+				_simpleReleaseDone = false;
 			}
 
 			void addAccess(DataAccess *access)
@@ -353,11 +364,18 @@ namespace ExecutionWorkflow {
 //						region.getStartAddress(), region.getSize());
 				/**
 				 * Perform the ArgoDSM selective_release
-				 * TODO: Enable the possibility to use node-wide release
-				 * TODO: Does this need to be outside the if statement?
 				 */
-				argo::backend::selective_release(region.getStartAddress(), region.getSize());
-
+				if(_simpleDependencies) {
+					if(!_simpleReleaseDone) {
+						//printf("[%d] ArgoReleaseStepLocal performing first node-wide release.\n",
+						//		nanos6_get_cluster_node_id());
+						argo::backend::release();
+						_simpleReleaseDone = true;
+					}
+				}else{
+					argo::backend::selective_release(region.getStartAddress(), region.getSize());
+				}
+				
 				_bytesToRelease -= region.getSize();
 				if (_bytesToRelease == 0) {
 					delete this;
@@ -377,6 +395,9 @@ namespace ExecutionWorkflow {
 
 		//! the cluster node we need to notify
 		ClusterNode const *_offloader;
+		
+		bool _simpleDependencies;
+		bool _simpleReleaseDone;
 
 		public:
 			ArgoReleaseStep(
@@ -386,6 +407,9 @@ namespace ExecutionWorkflow {
 				_offloader(context->getRemoteNode())
 			{
 				task->setDataReleaseStep(this);
+				ConfigVariable<bool> simpleDependencies("argodsm.simple_dependencies");
+				_simpleDependencies = simpleDependencies;
+				_simpleReleaseDone = false;
 			}
 
 			void addAccess(DataAccess *access)
@@ -416,11 +440,18 @@ namespace ExecutionWorkflow {
 //							region.getStartAddress(), region.getSize());
 					/**
 					 * Perform the ArgoDSM selective_release
-					 * TODO: Enable the possibility to use node-wide release
 					 * TODO: Does this need to be outside the if statement?
 					 */
-					argo::backend::selective_release(region.getStartAddress(), region.getSize());
-
+					if(_simpleDependencies) {
+						if(!_simpleReleaseDone) {
+							//printf("[%d] ArgoReleaseStep performing first node-wide release.\n",
+							//		nanos6_get_cluster_node_id());
+							argo::backend::release();
+							_simpleReleaseDone = true;
+						}
+					}else{
+						argo::backend::selective_release(region.getStartAddress(), region.getSize());
+					}
 					TaskOffloading::sendRemoteAccessRelease(
 							_remoteTaskIdentifier, _offloader, region, writeID, location
 							);
@@ -493,6 +524,9 @@ namespace ExecutionWorkflow {
 		WriteID _writeID;
 
 		bool _started;
+		
+		bool _simpleDependencies;
+		bool _simpleReleaseDone;
 
 		public:
 		ArgoDataLinkStep(
@@ -514,6 +548,10 @@ namespace ExecutionWorkflow {
 
 			assert(targetMemoryPlace->getType() == nanos6_device_t::nanos6_cluster_device);
 			int targetNamespace = targetMemoryPlace->getIndex();
+
+			ConfigVariable<bool> simpleDependencies("argodsm.simple_dependencies");
+			_simpleDependencies = simpleDependencies;
+			_simpleReleaseDone = false;
 
 			/* Starting workflow on another node: set the namespace and predecessor task */
 			if (ClusterManager::getDisableRemote()) {
@@ -584,7 +622,7 @@ namespace ExecutionWorkflow {
 
 			// NULL copy (do nothing, just release succesor and delete itself.)
 			return new Step();
-		}
+		} //TODO: This may not be safe with ArgoDSM, as some of the data may be remote?
 
 
 		bool needsTransfer =
@@ -616,7 +654,7 @@ namespace ExecutionWorkflow {
 				//! access, if the access is not read-only
 			 	(objectType == access_type)
 				&& (type != WRITE_ACCESS_TYPE)
-			);
+			); //TODO: Check if these conditions are correct for Argo
 
 		if (needsTransfer) {
 			/* If the memory address belongs to ArgoDSM memory space,

@@ -348,8 +348,8 @@ namespace ExecutionWorkflow {
 	{
 		assert(ClusterManager::getCurrentMemoryNode() == _targetMemoryPlace);
 
-		//! TODO: Is this unsafe? Can we trust that we have the data, or do
-		//! we have to complete a dt (dataTransfer) for this to be safe?
+		//! TODO: This is most likely unsafe with ArgoDSM, if all data is
+		//! local selective_acquire turns into a loop of nop anyway.
 
 		//! No data transfer needed, data is already here.
 		//if (_sourceMemoryPlace == _targetMemoryPlace) {
@@ -369,7 +369,16 @@ namespace ExecutionWorkflow {
 //					_region.getStartAddress(), _region.getSize());
 		/* Perform the ArgoDSM selective_acquire
 		 * TODO: Enable the possibility to use node-wide acquire */
-		argo::backend::selective_acquire(_region.getStartAddress(), _region.getSize());
+		if(_simpleDependencies) {
+			if(!_simpleAcquireDone) {
+				//printf("[%d] ArgoAcquireStep performing node-wide acquire.\n",
+				//		nanos6_get_cluster_node_id());
+				argo::backend::acquire();
+				_simpleAcquireDone = true;
+			}
+		}else{
+			argo::backend::selective_acquire(_region.getStartAddress(), _region.getSize());
+		}
 
 		releaseSuccessors();
 		delete this;
@@ -413,7 +422,16 @@ namespace ExecutionWorkflow {
 //						region.getStartAddress(), region.getSize());
 			/* Perform the ArgoDSM selective_release
 			 * TODO: Enable the possibility to use node-wide release */
-			argo::backend::selective_release(region.getStartAddress(), region.getSize());
+			if(_simpleDependencies) {
+				if(!_simpleReleaseDone) {
+					//printf("[%d] ArgoDataLinkStep performing node-wide release.\n",
+					//		nanos6_get_cluster_node_id());
+					argo::backend::release();
+					_simpleReleaseDone = true;
+				}
+			}else{
+				argo::backend::selective_release(region.getStartAddress(), region.getSize());
+			}
 
 			// namespacePredecessor is in principle irrelevant, because it only matters when the
 			// task is created, not when a satisfiability message is sent (which is what is
@@ -497,9 +515,17 @@ namespace ExecutionWorkflow {
 //			printf("[%d] ArgoDataLinkStep(start 1): Releasing(linking) address: %p size: %zu.\n",
 //						nanos6_get_cluster_node_id(),
 //						_region.getStartAddress(), _region.getSize());
-			/* Perform the ArgoDSM selective_release
-			 * TODO: Enable the possibility to use node-wide release */
-			argo::backend::selective_release(_region.getStartAddress(), _region.getSize());
+			// Perform the ArgoDSM selective_release
+			if(_simpleDependencies) {
+				if(!_simpleReleaseDone) {
+					//printf("[%d] ArgoDataLinkStep performing node-wide release.\n",
+					//		nanos6_get_cluster_node_id());
+					argo::backend::release();
+					_simpleReleaseDone = true;
+				}
+			}else{
+				argo::backend::selective_release(_region.getStartAddress(), _region.getSize());
+			}
 
 			const size_t linkedBytes = _region.getSize();
 			//! If at the moment of offloading the access is not both

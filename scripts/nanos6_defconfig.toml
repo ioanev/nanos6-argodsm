@@ -279,6 +279,13 @@ __require_CLUSTER
 	# local data. The default is 2.0, for which a task with twice as much dependency
 	# data not yet first-touched as data first-touched residing on any one node
 	locality_tuning = 2.0
+	# Enable simple dependencies which facilitate the use of dependency sentinels.
+	# Default is false. This switches off selective ArgoDSM coherence and performs
+	# node-wide acquire and release operations at each synchronization point, which
+	# may negatively impact performance. If sentinels are used, the recommended
+	# scheduling policy is "random", as there is no dependency data to determine
+	# a suitable node to offload to.
+	simple_dependencies = false
 
 __!require_CLUSTER
 
