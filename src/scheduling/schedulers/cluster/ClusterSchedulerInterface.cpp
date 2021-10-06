@@ -37,12 +37,10 @@ void ClusterSchedulerInterface::addReadyLocalOrExecuteRemote(
 	assert(targetNode != nullptr);
 
 	if (targetNode == _thisNode) {
-		//printf("[%d] Adding local task.\n", nanos6_get_cluster_node_id());
 		SchedulerInterface::addReadyTask(task, computePlace, hint);
 		return;
 	}
 
-	//printf("[%d] Offloading task to node: %d.\n", nanos6_get_cluster_node_id(), nodeId);
 	ClusterMemoryNode *memoryNode = targetNode->getMemoryNode();
 	assert(memoryNode != nullptr);
 

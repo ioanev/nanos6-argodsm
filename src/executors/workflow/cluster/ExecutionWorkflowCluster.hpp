@@ -359,16 +359,11 @@ namespace ExecutionWorkflow {
 					WriteID writeID,
 					MemoryPlace const *location) override
 			{
-//				printf("[%d] ArgoReleaseStepLocal(1): Release on addr: %p size: %zu.\n",
-//						nanos6_get_cluster_node_id(),
-//						region.getStartAddress(), region.getSize());
 				/**
 				 * Perform the ArgoDSM selective_release
 				 */
 				if(_simpleDependencies) {
 					if(!_simpleReleaseDone) {
-						//printf("[%d] ArgoReleaseStepLocal performing first node-wide release.\n",
-						//		nanos6_get_cluster_node_id());
 						argo::backend::release();
 						_simpleReleaseDone = true;
 					}
@@ -435,17 +430,12 @@ namespace ExecutionWorkflow {
 							"releasing remote region:", region
 							);
 
-//					printf("[%d] ArgoReleaseStep(1): Release on addr: %p size: %zu.\n",
-//							nanos6_get_cluster_node_id(),
-//							region.getStartAddress(), region.getSize());
 					/**
 					 * Perform the ArgoDSM selective_release
 					 * TODO: Does this need to be outside the if statement?
 					 */
 					if(_simpleDependencies) {
 						if(!_simpleReleaseDone) {
-							//printf("[%d] ArgoReleaseStep performing first node-wide release.\n",
-							//		nanos6_get_cluster_node_id());
 							argo::backend::release();
 							_simpleReleaseDone = true;
 						}

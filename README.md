@@ -30,7 +30,7 @@ In addition to the build requirements, the following libraries and tools enable 
 1. [DLB](https://pm.bsc.es/dlb) to enable dynamic management and sharing of computing resources
 1. [jemalloc](https://github.com/jemalloc/jemalloc) to use jemalloc as the default memory allocator, providing better performance than the default glibc implementation. Jemalloc must be compiled with `--enable-stats` and `--with-jemalloc-prefix=nanos6_je_` to link with the runtime
 1. [PAPI](http://icl.utk.edu/papi/software/) >= 5.6.0
-1. [ArgoDSM](https://gitlab.itwm.fraunhofer.de/EPEEC/argodsm) to enable support for the ArgoDSM shared memory backend.
+1. [ArgoDSM](https://github.com/epeec/argodsm) to enable support for the ArgoDSM shared memory backend.
 
 ## Build procedure
 
@@ -433,13 +433,25 @@ Nanos6 needs to be configured with the `--enable-cluster` flag.
 For more information on how to write and run cluster applications see [Cluster.md](docs/cluster/Cluster.md).
 
 ## ArgoDSM support
+
 **In order to execute Nanos6-ArgoDSM applications with ArgoDSM support**, the following configuration variables have to be set.
 
-`cluster.communication=argo`
-`argo.distributed_memory="1G"`
-`argo.cache_size="1G"`
+- `cluster.communication="argodsm"`
+- `argodsm.distributed_memory="16G"`
+- `argodsm.cache_size="4G"`
 
-`argo.distributed_memory` dictates the amount of memory ArgoDSM will reserve on the system in bytes, divided equally among all nodes. The ArgoDSM page cache resides in memory, and With very large distributed memory sizes, `argo.cache_size` can be used to request an ArgoDSM cache size smaller than the default value equal to the distributed size. This may be essential to obtain good performance. For additional configuration variables see [Cluster.md](docs/cluster/Cluster.md).
+`argo.distributed_memory` dictates the amount of memory ArgoDSM will reserve on the system in bytes, divided equally among all nodes. The ArgoDSM page cache resides in memory on each cluster node, and with very large distributed memory sizes, `argo.cache_size` can be used to request an ArgoDSM cache size smaller than the default value equal to the distributed memory size. For additional configuration variables see [Cluster.md](docs/cluster/Cluster.md).
+
+ArgoDSM provides experimental support for *simple dependencies*, where *sentinels* representing a larger data structure or a set of data can be used to control concurrency between tasks without specifying a full list of dependencies.
+```
+int sentinel;
+#pragma oss task inout (sentinel)
+foo(...)
+```
+When sentinels are used instead of full dependencies, the runtime system can neither make intelligent suggestions about on task placement based on data locations, nor provide the ArgoDSM backend with detailed coherence information. As such, this simplification may impact performance negatively and should be used only with this in mind. In order to enable simple dependencies, the following configuration parameters must be set.
+
+- `argodsm.simple_dependencies=true`
+- `cluster.scheduling_policy="random"`
 
 Depending on the system configuration, it may also be necessary to disable *address space layout randomization* (ASLR). It is recommended to execute Nanos6-ArgoDSM applications through mpirun or mpiexec. In order to execute a Nanos6-ArgoDSM application compiled with Mercurium on four nodes with ASLR disabled, execute the following:
 ```

@@ -364,15 +364,9 @@ namespace ExecutionWorkflow {
 			_sourceMemoryPlace->getIndex()
 		);
 
-//		printf("[%d] ArgoAcquireStep (1): Acquiring address: %p size: %zu.\n",
-//					nanos6_get_cluster_node_id(),
-//					_region.getStartAddress(), _region.getSize());
-		/* Perform the ArgoDSM selective_acquire
-		 * TODO: Enable the possibility to use node-wide acquire */
+		/* Perform the ArgoDSM acquire operation */
 		if(_simpleDependencies) {
 			if(!_simpleAcquireDone) {
-				//printf("[%d] ArgoAcquireStep performing node-wide acquire.\n",
-				//		nanos6_get_cluster_node_id());
 				argo::backend::acquire();
 				_simpleAcquireDone = true;
 			}
@@ -417,15 +411,9 @@ namespace ExecutionWorkflow {
 				locationIndex = location->getIndex();
 			}
 
-//			printf("[%d] ArgoDataLinkStep(linkregion 1): Releasing(linking) address: %p size: %zu.\n",
-//						nanos6_get_cluster_node_id(),
-//						region.getStartAddress(), region.getSize());
-			/* Perform the ArgoDSM selective_release
-			 * TODO: Enable the possibility to use node-wide release */
+			/* Perform the ArgoDSM release operation */
 			if(_simpleDependencies) {
 				if(!_simpleReleaseDone) {
-					//printf("[%d] ArgoDataLinkStep performing node-wide release.\n",
-					//		nanos6_get_cluster_node_id());
 					argo::backend::release();
 					_simpleReleaseDone = true;
 				}
@@ -512,14 +500,9 @@ namespace ExecutionWorkflow {
 			// assert(_sourceMemoryPlace->getIndex() == _sourceMemoryPlace->getCommIndex());
 			execStep->addDataLink(location, _region, _writeID, _read, _write, (void *)_namespacePredecessor);
 
-//			printf("[%d] ArgoDataLinkStep(start 1): Releasing(linking) address: %p size: %zu.\n",
-//						nanos6_get_cluster_node_id(),
-//						_region.getStartAddress(), _region.getSize());
-			// Perform the ArgoDSM selective_release
+			// Perform the ArgoDSM release operation
 			if(_simpleDependencies) {
 				if(!_simpleReleaseDone) {
-					//printf("[%d] ArgoDataLinkStep performing node-wide release.\n",
-					//		nanos6_get_cluster_node_id());
 					argo::backend::release();
 					_simpleReleaseDone = true;
 				}
