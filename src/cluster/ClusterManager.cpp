@@ -238,7 +238,6 @@ void ClusterManager::fetchVector(
 			//_content->_remoteRegionInfo[index]._id
 			//	= (index == 0 ? getId() : MessageId::nextMessageId());
 
-
 			temporal[index] = fetchDataRaw(
 				content->_remoteRegionInfo[index]._remoteRegion,
 				from,

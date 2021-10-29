@@ -286,6 +286,12 @@ __require_CLUSTER
 	# scheduling policy is "random", as there is no dependency data to determine
 	# a suitable node to offload to.
 	simple_dependencies = false
+	# Enable full (node-wide) release fences irrespective of simple dependencies.
+	# Note that simple dependencies overrides this setting.
+	full_release = false
+	# Enable full (node-wide) acquire fences irrespective of simple dependencies.
+	# Note that simple dependencies overrides this setting.
+	full_acquire = false
 
 __!require_CLUSTER
 

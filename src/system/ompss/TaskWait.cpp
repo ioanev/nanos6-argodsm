@@ -51,12 +51,12 @@ void TaskWait::taskWait(char const *invocationSource, bool fromUserCode, bool no
 		// This in combination with a release from the children makes their changes visible to this thread
 		std::atomic_thread_fence(std::memory_order_acquire);
 
-		// Ensure ArgoDSM coherence by self-invalidating
-		//TODO Check if we are in cluster and using argo
-		EnvironmentVariable<std::string> commType("NANOS6_COMMUNICATION", "disabled");
-		if(commType.getValue() == "argodsm"){
-			argo::backend::acquire();
-		}
+		//// Ensure ArgoDSM coherence by self-invalidating
+		////TODO Check if we are in cluster and using argo
+		//EnvironmentVariable<std::string> commType("NANOS6_COMMUNICATION", "disabled");
+		//if(commType.getValue() == "argodsm"){
+		//	argo::backend::acquire();
+		//}
 
 		// Runtime Tracking Point - Exiting a taskwait, the task will be resumed
 		TrackingPoints::exitTaskWait(currentTask, fromUserCode);
@@ -97,12 +97,12 @@ void TaskWait::taskWait(char const *invocationSource, bool fromUserCode, bool no
 	// This in combination with a release from the children makes their changes visible to this thread
 	std::atomic_thread_fence(std::memory_order_acquire);
 
-	// Ensure ArgoDSM coherence by self-invalidating
-	//TODO Check if we are in cluster and using argo
-	ConfigVariable<std::string> commType("cluster.communication");
-	if(commType.getValue() == "argodsm"){
-		argo::backend::acquire();
-	}
+	//// Ensure ArgoDSM coherence by self-invalidating
+	////TODO Check if we are in cluster and using argo
+	//ConfigVariable<std::string> commType("cluster.communication");
+	//if(commType.getValue() == "argodsm"){
+	//	argo::backend::acquire();
+	//}
 
 	assert(currentTask->canBeWokenUp());
 	currentTask->markAsUnblocked();

@@ -35,6 +35,8 @@ void ConfigCentral::initialize()
 	registerOption<memory_t>("argodsm.cache_size", 1UL << 30);
 	registerOption<float_t>("argodsm.locality_tuning", 2.0);
 	registerOption<bool_t>("argodsm.simple_dependencies", false);
+	registerOption<bool_t>("argodsm.full_release", false);
+	registerOption<bool_t>("argodsm.full_acquire", false);
 
 	// CPU manager
 	registerOption<string_t>("cpumanager.policy", "default");
