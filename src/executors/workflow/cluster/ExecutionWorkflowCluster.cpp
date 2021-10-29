@@ -224,7 +224,9 @@ namespace ExecutionWorkflow {
 		assert(_sourceMemoryPlace != _targetMemoryPlace);
 		// TODO: If this condition never trigers then the _writeID member can be removed. from this
 		// class.
-
+		
+		printf("[%d] ClusterDataCopyStep::requiresDataFetch() checking if fetch is needed: ",
+				nanos6_get_cluster_node_id());
 		if (!_needsTransfer) {
 			//! This access doesn't need a transfer.
 			//! We need to perform the data access registration if it is
@@ -237,17 +239,20 @@ namespace ExecutionWorkflow {
 					_isTaskwait
 				);
 			}
+			printf("NO - !needsTransfer\n");
 			releaseSuccessors();
 			delete this;
 			return false;
 		}
 
 		if (WriteIDManager::checkWriteIDLocal(_writeID, _fullRegion)) {
+			printf("NO - local writer ID\n");
 			releaseSuccessors();
 			delete this;
 			return false;
 		}
 
+		printf("YES\n");
 		// Now check pending data transfers because the same data transfer
 		// (or one fully containing it) may already be pending. An example
 		// would be when several tasks with an "in" dependency on the same
@@ -344,38 +349,187 @@ namespace ExecutionWorkflow {
 		delete this;
 	}
 
-	void ArgoAcquireStep::start()
+	ArgoAcquireStep::ArgoAcquireStep(
+		MemoryPlace const *sourceMemoryPlace,
+		MemoryPlace const *targetMemoryPlace,
+		DataAccessRegion const &region,
+		Task *task,
+		WriteID writeID,
+		bool isTaskwait,
+		bool isWeak,
+		bool needsTransfer
+	) : Step(),
+		_sourceMemoryPlace(sourceMemoryPlace),
+		_targetMemoryPlace(targetMemoryPlace),
+		_fullRegion(region),
+		_regionsFragments(),
+		_task(task),
+		_writeID(writeID),
+		_isTaskwait(isTaskwait),
+		_isWeak(isWeak),
+		_needsTransfer(needsTransfer)
 	{
-		assert(ClusterManager::getCurrentMemoryNode() == _targetMemoryPlace);
+		// ArgoDSM specifics
+		ConfigVariable<bool> simpleDependencies("argodsm.simple_dependencies");
+		_simpleDependencies = simpleDependencies;
+		_simpleAcquireDone = false;
+		
+		// We fragment the transfers here.
+		// TODO: If this affects performance, we can do the fragmentation on demand.
+		// So only when the fragmentation is goinf to take place.
+		//_nFragments = ClusterManager::getMPIFragments(region);
 
-		//! TODO: This is most likely unsafe with ArgoDSM, if all data is
-		//! local selective_acquire turns into a loop of nop anyway.
+		//char *start = (char *)region.getStartAddress();
 
-		//! No data transfer needed, data is already here.
-		//if (_sourceMemoryPlace == _targetMemoryPlace) {
-		//	releaseSuccessors();
-		//	delete this;
-		//	return;
+		//for (size_t i = 0; start < region.getEndAddress(); ++i) {
+
+		//	assert(i < _nFragments);
+		//	char *end = (char *) region.getEndAddress();
+
+		//	char *tmp = start + ClusterManager::getMessageMaxSize();
+		//	if (tmp < end) {
+		//		end = tmp;
+		//	}
+
+		//	_regionsFragments.push_back(DataAccessRegion(start, end));
+
+		//	start = tmp;
 		//}
 
-		Instrument::logMessage(
-			Instrument::ThreadInstrumentationContext::getCurrent(),
-			"ArgoAcquireStep emulating transfer of data from Node:",
-			_sourceMemoryPlace->getIndex()
-		);
+		//_postcallback = [&]() {
+		//	if (--_nFragments == 0) {
+		//		//! If this data copy is performed for a taskwait we don't need to update the
+		//		//! location here.
+		//		DataAccessRegistration::updateTaskDataAccessLocation(
+		//			_task,
+		//			_fullRegion,
+		//			_targetMemoryPlace,
+		//			_isTaskwait
+		//		);
+		//		this->releaseSuccessors();
+		//		delete this;
+		//	}
+		//};
+	}
 
-		/* Perform the ArgoDSM acquire operation */
-		if(_simpleDependencies) {
-			if(!_simpleAcquireDone) {
-				argo::backend::acquire();
-				_simpleAcquireDone = true;
+
+	bool ArgoAcquireStep::requiresDataFetch()
+	{
+		assert(ClusterManager::getCurrentMemoryNode() == _targetMemoryPlace);
+		assert(_sourceMemoryPlace->getType() == nanos6_cluster_device);
+		assert(_targetMemoryPlace->getType() == nanos6_cluster_device);
+		assert(_sourceMemoryPlace != _targetMemoryPlace);
+		// TODO: If this condition never trigers then the _writeID member can be removed. from this
+		// class.
+		
+		printf("[%d] AAS::requiresDataFetch(%p, %zu) checking if fetch is needed for: ",
+				nanos6_get_cluster_node_id(),
+				_fullRegion.getStartAddress(),
+				_fullRegion.getSize());
+		if (!_needsTransfer) {
+			//! This access doesn't need a transfer.
+			//! We need to perform the data access registration if it is
+			//! a non-weak output access. Otherwise there is nothing to do.
+			if (!_isTaskwait && !_isWeak) {
+				DataAccessRegistration::updateTaskDataAccessLocation(
+					_task,
+					_fullRegion,
+					_targetMemoryPlace,
+					_isTaskwait
+				);
 			}
-		}else{
-			argo::backend::selective_acquire(_region.getStartAddress(), _region.getSize());
+			printf("NO - !needsTransfer\n");
+			releaseSuccessors();
+			delete this;
+			return false;
 		}
 
-		releaseSuccessors();
+		if (WriteIDManager::checkWriteIDLocal(_writeID, _fullRegion)) {
+			printf("NO - local writer ID\n");
+			releaseSuccessors();
+			delete this;
+			return false;
+		}
+
+		printf("YES\n");
+
+		// Perform Argo acquire or selective acquire
+		if(_simpleDependencies && !_simpleAcquireDone){
+			argo::backend::acquire();
+			_simpleAcquireDone = true;
+		}else{
+			printf("[%d] performing selective_acquire(%p, %zu)\n",
+					nanos6_get_cluster_node_id(),
+					_fullRegion.getStartAddress(),
+					_fullRegion.getSize());
+			argo::backend::selective_acquire(
+					_fullRegion.getStartAddress(),
+					_fullRegion.getSize());
+		}
+
+		// Register data location
+		DataAccessRegistration::updateTaskDataAccessLocation(
+				_task,
+				_fullRegion,
+				_targetMemoryPlace,
+				_isTaskwait
+				);
+
+		// Release successors and return
+		this->releaseSuccessors();
 		delete this;
+		return true;
+
+//		// Now check pending data transfers because the same data transfer
+//		// (or one fully containing it) may already be pending. An example
+//		// would be when several tasks with an "in" dependency on the same
+//		// data region are offloaded at a similar time.
+//		bool handled = ClusterPollingServices::PendingQueue<DataTransfer>::checkPendingQueue(
+//
+//			// This lambda is called for all pending data transfers (with the lock taken)
+//			[&](DataTransfer *dtPending) {
+//
+//				// Check whether the pending data transfer has the same target
+//				// (this node) and that it fully contains the current region.
+//				// Note: it is important to check that the target matches
+//				// because outgoing and incoming data transfers are held in the
+//				// same queue.  It is possible for an outgoing message transfer
+//				// to still be in the queue because of the race condition
+//				// between (a) remote task completion and triggering incoming
+//				// data fetches and (b) completing the outgoing data transfer.
+//
+//				const DataAccessRegion pendingRegion = dtPending->getDataAccessRegion();
+//				const MemoryPlace *pendingTarget = dtPending->getTarget();
+//				assert(pendingTarget->getType() == nanos6_cluster_device);
+//
+//				if (pendingTarget->getIndex() == _targetMemoryPlace->getIndex()
+//					&& _fullRegion.fullyContainedIn(pendingRegion)) {
+//
+//					// Yes, the pending data transfer contains this region: so add a callback
+//					// for this task
+//					dtPending->addCompletionCallback(
+//						[&]() {
+//							//! If this data copy is performed for a taskwait we
+//							//! don't need to update the location here.
+//							DataAccessRegistration::updateTaskDataAccessLocation(
+//								_task,
+//								_fullRegion,
+//								_targetMemoryPlace,
+//								_isTaskwait
+//							);
+//							this->releaseSuccessors();
+//							delete this;
+//						});
+//					// Done, so return true: do not check any more pending transfers and
+//					// also return true to the caller
+//					return true;
+//				}
+//				// Not a match: continue checking pending data transfers
+//				return false;
+//			}
+//		);
+//
+//		return (handled == false);
 	}
 
 	void ArgoDataLinkStep::linkRegion(
@@ -418,6 +572,10 @@ namespace ExecutionWorkflow {
 					_simpleReleaseDone = true;
 				}
 			}else{
+				printf("[%d] performing selective_release(%p, %zu)\n",
+					nanos6_get_cluster_node_id(),
+					region.getStartAddress(),
+					region.getSize());
 				argo::backend::selective_release(region.getStartAddress(), region.getSize());
 			}
 
@@ -507,6 +665,10 @@ namespace ExecutionWorkflow {
 					_simpleReleaseDone = true;
 				}
 			}else{
+				printf("[%d] performing selective_release(%p, %zu)\n",
+					nanos6_get_cluster_node_id(),
+					_region.getStartAddress(),
+					_region.getSize());
 				argo::backend::selective_release(_region.getStartAddress(), _region.getSize());
 			}
 

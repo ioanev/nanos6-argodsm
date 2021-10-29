@@ -145,6 +145,22 @@ namespace ExecutionWorkflow {
 	{
 		std::map<MemoryPlace const*, size_t> fragments;
 		std::map<MemoryPlace const*, std::vector<ClusterDataCopyStep *>> groups;
+		ConfigVariable<std::string> commType("cluster.communication");
+
+		// If ArgoDSM is enabled, execute reduced code
+		if(commType.getValue() == "argodsm"){
+			for (Step *step : _rootSteps) {
+				ArgoAcquireStep *acquireStep = dynamic_cast<ArgoAcquireStep *>(step);
+
+				if(!acquireStep) {
+					step->start();
+					continue;
+				}
+
+				acquireStep->requiresDataFetch();
+			}
+			return;
+		}
 
 		// Iterate over all the rootSteps. There will be null copies
 		for (Step *step : _rootSteps) {

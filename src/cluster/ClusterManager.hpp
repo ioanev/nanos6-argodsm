@@ -347,7 +347,7 @@ public:
 		//! the same as the local one
 		MessageDataSend msg(_singleton->_thisNode, region);
 		_singleton->_msn->sendMessage(&msg, remoteNode, true);
-
+		
 		return sendDataRaw(region, to, msg.getId(), block);
 	}
 

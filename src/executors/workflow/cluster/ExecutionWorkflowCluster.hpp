@@ -310,7 +310,27 @@ namespace ExecutionWorkflow {
 		MemoryPlace const *_targetMemoryPlace;
 
 		//! The DataAccessRegion corresponding to this data release
-		DataAccessRegion _region;
+		DataAccessRegion const _fullRegion;
+		std::vector<DataAccessRegion> _regionsFragments;
+
+		//! The task on behalf of which we perform the data copy
+		Task *_task;
+
+		WriteID _writeID;
+
+		//! The data copy is for a taskwait
+		bool _isTaskwait;
+
+		//! The access is weak
+		bool _isWeak;
+
+		//! An actual data transfer is required
+		bool _needsTransfer;
+
+		//! Number of fragments messages
+		size_t _nFragments;
+
+		DataTransfer::data_transfer_callback_t _postcallback;
 		
 		bool _simpleDependencies;
 		bool _simpleAcquireDone;
@@ -319,18 +339,45 @@ namespace ExecutionWorkflow {
 		ArgoAcquireStep(
 			MemoryPlace const *sourceMemoryPlace,
 			MemoryPlace const *targetMemoryPlace,
-			DataAccessRegion const &region
-		) : Step(),
-			_sourceMemoryPlace(sourceMemoryPlace),
-			_targetMemoryPlace(targetMemoryPlace),
-			_region(region)
+			DataAccessRegion const &region,
+			Task *task,
+			WriteID writeID,
+			bool isTaskwait,
+			bool isWeak,
+			bool needsTransfer
+		);
+
+		//! Start the execution of the Step
+		void start() override
 		{
-			ConfigVariable<bool> simpleDependencies("argodsm.simple_dependencies");
-			_simpleDependencies = simpleDependencies;
-			_simpleAcquireDone = false;
+		};
+
+		bool requiresDataFetch();
+
+		MemoryPlace const *getSourceMemoryPlace() const
+		{
+			return _sourceMemoryPlace ;
 		}
 
-		void start();
+		MemoryPlace const *getTargetMemoryPlace() const
+		{
+			return _targetMemoryPlace ;
+		}
+
+		size_t getNumFragments() const
+		{
+			return _nFragments;
+		}
+
+		const std::vector<DataAccessRegion> &getFragments() const
+		{
+			return _regionsFragments;
+		}
+
+		DataTransfer::data_transfer_callback_t getPostCallback() const
+		{
+			return _postcallback;
+		}
 	};
 
 	class ArgoReleaseStepLocal : public DataReleaseStep {
@@ -368,6 +415,10 @@ namespace ExecutionWorkflow {
 						_simpleReleaseDone = true;
 					}
 				}else{
+					printf("[%d] performing selective_release(%p, %zu)\n",
+							nanos6_get_cluster_node_id(),
+							region.getStartAddress(),
+							region.getSize());
 					argo::backend::selective_release(region.getStartAddress(), region.getSize());
 				}
 				
@@ -406,7 +457,7 @@ namespace ExecutionWorkflow {
 				_simpleDependencies = simpleDependencies;
 				_simpleReleaseDone = false;
 			}
-
+			
 			void addAccess(DataAccess *access)
 			{
 				_bytesToRelease += access->getAccessRegion().getSize();
@@ -440,6 +491,10 @@ namespace ExecutionWorkflow {
 							_simpleReleaseDone = true;
 						}
 					}else{
+						printf("[%d] performing selective_release(%p, %zu)\n",
+								nanos6_get_cluster_node_id(),
+								region.getStartAddress(),
+								region.getSize());
 						argo::backend::selective_release(region.getStartAddress(), region.getSize());
 					}
 					TaskOffloading::sendRemoteAccessRelease(
@@ -578,6 +633,7 @@ namespace ExecutionWorkflow {
 		assert(source != nullptr);
 		nanos6_device_t sourceType = source->getType();
 		assert(target == ClusterManager::getCurrentMemoryNode());
+		// TODO: Move checking of commType to somewhere "global"
 		ConfigVariable<std::string> commType("cluster.communication");
 
 		//! Currently, we cannot have a cluster data copy where the source
@@ -646,26 +702,33 @@ namespace ExecutionWorkflow {
 				&& (type != WRITE_ACCESS_TYPE)
 			); //TODO: Check if these conditions are correct for Argo
 
-		if (needsTransfer) {
-			/* If the memory address belongs to ArgoDSM memory space,
-			 * perform an Argo step instead of a Nanos6 step */
-			if(commType.getValue() == "argodsm"){
-				if (argo::is_argo_address(region.getStartAddress())) {
-					return new ArgoAcquireStep(source, target, region);
-				}
+		// If the memory address belongs to ArgoDSM memory space,
+		// perform an Argo step instead of a Nanos6 step
+		if(commType.getValue() == "argodsm"){
+			if (argo::is_argo_address(region.getStartAddress())) {
+				return new ArgoAcquireStep(
+							source,
+							target,
+							inregion,
+							access->getOriginator(),
+							access->getWriteID(),
+							(objectType == taskwait_type),
+							access->isWeak(),
+							needsTransfer
+							);
 			}
+		}else{
+			return new ClusterDataCopyStep(
+					source,
+					target,
+					inregion,
+					access->getOriginator(),
+					access->getWriteID(),
+					(objectType == taskwait_type),
+					access->isWeak(),
+					needsTransfer
+					);
 		}
-
-		return new ClusterDataCopyStep(
-			source,
-			target,
-			inregion,
-			access->getOriginator(),
-			access->getWriteID(),
-			(objectType == taskwait_type),
-			access->isWeak(),
-			needsTransfer
-		);
 
 	}
 
