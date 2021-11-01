@@ -225,8 +225,8 @@ namespace ExecutionWorkflow {
 		// TODO: If this condition never trigers then the _writeID member can be removed. from this
 		// class.
 		
-		printf("[%d] ClusterDataCopyStep::requiresDataFetch() checking if fetch is needed: ",
-				nanos6_get_cluster_node_id());
+		//printf("[%d] ClusterDataCopyStep::requiresDataFetch() checking if fetch is needed: ",
+		//		nanos6_get_cluster_node_id());
 		if (!_needsTransfer) {
 			//! This access doesn't need a transfer.
 			//! We need to perform the data access registration if it is
@@ -239,20 +239,20 @@ namespace ExecutionWorkflow {
 					_isTaskwait
 				);
 			}
-			printf("NO - !needsTransfer\n");
+			//printf("NO - !needsTransfer\n");
 			releaseSuccessors();
 			delete this;
 			return false;
 		}
 
 		if (WriteIDManager::checkWriteIDLocal(_writeID, _fullRegion)) {
-			printf("NO - local writer ID\n");
+			//printf("NO - local writer ID\n");
 			releaseSuccessors();
 			delete this;
 			return false;
 		}
 
-		printf("YES\n");
+		//printf("YES\n");
 		// Now check pending data transfers because the same data transfer
 		// (or one fully containing it) may already be pending. An example
 		// would be when several tasks with an "in" dependency on the same
@@ -374,6 +374,11 @@ namespace ExecutionWorkflow {
 		_simpleDependencies = simpleDependencies;
 		_simpleAcquireDone = false;
 		
+		//printf("[%d] Creating ArgoAcquireStep for (%p, %zu).\n",
+		//		nanos6_get_cluster_node_id(),
+		//		_fullRegion.getStartAddress(),
+		//		_fullRegion.getSize());
+		
 		// We fragment the transfers here.
 		// TODO: If this affects performance, we can do the fragmentation on demand.
 		// So only when the fragmentation is goinf to take place.
@@ -422,10 +427,11 @@ namespace ExecutionWorkflow {
 		// TODO: If this condition never trigers then the _writeID member can be removed. from this
 		// class.
 		
-		printf("[%d] AAS::requiresDataFetch(%p, %zu) checking if fetch is needed for: ",
-				nanos6_get_cluster_node_id(),
-				_fullRegion.getStartAddress(),
-				_fullRegion.getSize());
+		//printf("[%d] AAS::requiresDataFetch(%p, %zu) (TW: %d) checking if fetch is needed for: ",
+		//		nanos6_get_cluster_node_id(),
+		//		_fullRegion.getStartAddress(),
+		//		_fullRegion.getSize(),
+		//		_isTaskwait);
 		if (!_needsTransfer) {
 			//! This access doesn't need a transfer.
 			//! We need to perform the data access registration if it is
@@ -438,30 +444,30 @@ namespace ExecutionWorkflow {
 					_isTaskwait
 				);
 			}
-			printf("NO - !needsTransfer\n");
+			//printf("NO - !needsTransfer\n");
 			releaseSuccessors();
 			delete this;
 			return false;
 		}
 
 		if (WriteIDManager::checkWriteIDLocal(_writeID, _fullRegion)) {
-			printf("NO - local writer ID\n");
+			//printf("NO - local writer ID\n");
 			releaseSuccessors();
 			delete this;
 			return false;
 		}
 
-		printf("YES\n");
+		//printf("YES\n");
 
 		// Perform Argo acquire or selective acquire
 		if(_simpleDependencies && !_simpleAcquireDone){
 			argo::backend::acquire();
 			_simpleAcquireDone = true;
 		}else{
-			printf("[%d] performing selective_acquire(%p, %zu)\n",
-					nanos6_get_cluster_node_id(),
-					_fullRegion.getStartAddress(),
-					_fullRegion.getSize());
+			//printf("[%d] performing selective_acquire(%p, %zu)\n",
+			//		nanos6_get_cluster_node_id(),
+			//		_fullRegion.getStartAddress(),
+			//		_fullRegion.getSize());
 			argo::backend::selective_acquire(
 					_fullRegion.getStartAddress(),
 					_fullRegion.getSize());
@@ -572,10 +578,10 @@ namespace ExecutionWorkflow {
 					_simpleReleaseDone = true;
 				}
 			}else{
-				printf("[%d] performing selective_release(%p, %zu)\n",
-					nanos6_get_cluster_node_id(),
-					region.getStartAddress(),
-					region.getSize());
+				//printf("[%d] ArgoDataLinkstep::LinkRegion() performing selective_release(%p, %zu)\n",
+				//	nanos6_get_cluster_node_id(),
+				//	region.getStartAddress(),
+				//	region.getSize());
 				argo::backend::selective_release(region.getStartAddress(), region.getSize());
 			}
 
@@ -665,10 +671,10 @@ namespace ExecutionWorkflow {
 					_simpleReleaseDone = true;
 				}
 			}else{
-				printf("[%d] performing selective_release(%p, %zu)\n",
-					nanos6_get_cluster_node_id(),
-					_region.getStartAddress(),
-					_region.getSize());
+				//printf("[%d] ArgoDataLinkStep::start() performing selective_release(%p, %zu)\n",
+				//	nanos6_get_cluster_node_id(),
+				//	_region.getStartAddress(),
+				//	_region.getSize());
 				argo::backend::selective_release(_region.getStartAddress(), _region.getSize());
 			}
 

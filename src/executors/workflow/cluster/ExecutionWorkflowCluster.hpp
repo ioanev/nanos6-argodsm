@@ -396,37 +396,72 @@ namespace ExecutionWorkflow {
 				_simpleReleaseDone = false;
 			}
 
-			void addAccess(DataAccess *access)
-			{
-				_bytesToRelease += access->getAccessRegion().getSize();
-			}
+			//void addAccess(DataAccess *access)
+			//{
+			//	_bytesToRelease += access->getAccessRegion().getSize();
+			//}
 
-			void releaseRegion(
-					DataAccessRegion const &region,
-					WriteID writeID,
-					MemoryPlace const *location) override
-			{
-				/**
-				 * Perform the ArgoDSM selective_release
-				 */
-				if(_simpleDependencies) {
-					if(!_simpleReleaseDone) {
-						argo::backend::release();
-						_simpleReleaseDone = true;
-					}
-				}else{
-					printf("[%d] performing selective_release(%p, %zu)\n",
-							nanos6_get_cluster_node_id(),
-							region.getStartAddress(),
-							region.getSize());
-					argo::backend::selective_release(region.getStartAddress(), region.getSize());
-				}
-				
-				_bytesToRelease -= region.getSize();
-				if (_bytesToRelease == 0) {
-					delete this;
-				}
-			}
+			//void releaseRegion(
+			//		DataAccessRegion const &region,
+			//		WriteID writeID,
+			//		MemoryPlace const *location) override
+			//{
+			//	/**
+			//	 * Perform the ArgoDSM selective_release
+			//	 */
+			//	if(_simpleDependencies) {
+			//		if(!_simpleReleaseDone) {
+			//			argo::backend::release();
+			//			_simpleReleaseDone = true;
+			//		}
+			//	}else{
+			//		printf("[%d] ARSLocal::releaseRegion() performing selective_release(%p, %zu)\n",
+			//				nanos6_get_cluster_node_id(),
+			//				region.getStartAddress(),
+			//				region.getSize());
+			//		argo::backend::selective_release(region.getStartAddress(), region.getSize());
+			//	}
+			//	
+			//	_bytesToRelease -= region.getSize();
+			//	if (_bytesToRelease == 0) {
+			//		delete this;
+			//	}else if(_bytesToRelease < 0){
+			//		printf("[%d] ERROR: _bytesToRelease below 0.\n",
+			//				nanos6_get_cluster_node_id());
+			//	}
+			//}
+			
+			//bool checkDataRelease(DataAccess const *access) override
+			//{
+			//	Task *task = access->getOriginator();
+
+			//	const bool mustWait = task->mustDelayRelease() && !task->allChildrenHaveFinished();
+
+			//	const bool releases = ( (access->getObjectType() == taskwait_type) // top level sink
+			//			|| !access->hasSubaccesses()) // or no fragments (i.e. no subtask to wait for)
+			//		&& task->hasFinished()     // must have finished; i.e. not taskwait inside task
+			//		&& (!(access->getObjectType() == taskwait_type) && !task->isRemoteTask())
+			//		&& access->readSatisfied() && access->writeSatisfied()
+			//		&& access->complete()                       // access must be complete
+			//		&& !access->hasNext()                       // no next access at the remote side
+			//		&& !mustWait;
+
+			//		//&& access->getOriginator()->isRemoteTask()  // only offloaded tasks: necessary (e.g. otherwise taskwait on will release)
+			//	Instrument::logMessage(
+			//			Instrument::ThreadInstrumentationContext::getCurrent(),
+			//			"Checking DataRelease access:", access->getInstrumentationId(),
+			//			" object_type:", access->getObjectType(),
+			//			" spawned originator:", access->getOriginator()->isSpawned(),
+			//			" read:", access->readSatisfied(),
+			//			" write:", access->writeSatisfied(),
+			//			" complete:", access->complete(),
+			//			" has-next:", access->hasNext(),
+			//			" task finished:", task->hasFinished(),
+			//			" releases:", releases
+			//			);
+
+			//	return releases;
+			//}
 
 			void start() override
 			{
@@ -491,10 +526,10 @@ namespace ExecutionWorkflow {
 							_simpleReleaseDone = true;
 						}
 					}else{
-						printf("[%d] performing selective_release(%p, %zu)\n",
-								nanos6_get_cluster_node_id(),
-								region.getStartAddress(),
-								region.getSize());
+						//printf("[%d] ARS::releaseRegion() performing selective_release(%p, %zu)\n",
+						//		nanos6_get_cluster_node_id(),
+						//		region.getStartAddress(),
+						//		region.getSize());
 						argo::backend::selective_release(region.getStartAddress(), region.getSize());
 					}
 					TaskOffloading::sendRemoteAccessRelease(
@@ -610,6 +645,10 @@ namespace ExecutionWorkflow {
 			}
 
 			DataAccessRegistration::setNamespaceSelf(access, targetNamespace);
+			//printf("[%d] Creating ArgoDataLinkStep for (%p, %zu).\n",
+			//		nanos6_get_cluster_node_id(),
+			//		_region.getStartAddress(),
+			//		_region.getSize());
 		}
 
 		void linkRegion(
