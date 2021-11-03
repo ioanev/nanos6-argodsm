@@ -58,6 +58,9 @@ int nanos6_get_num_cluster_nodes(void);
 //! \returns namespace propagation is enables.
 int nanos6_get_namespace_is_enabled(void);
 
+//! \brief Reset the ArgoDSM statistics for each node
+void nanos6_argo_reset_stats(void);
+
 //! \brief Allocate distributed memory
 //!
 //! Distributed memory is a clsuter type of memory that can only be

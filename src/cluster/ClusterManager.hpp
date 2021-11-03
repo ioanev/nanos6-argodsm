@@ -383,6 +383,13 @@ public:
 	//! \param[in] args is the callback function argument
 	static void initClusterNamespaceOrSetCallback(void (*func)(void *), void *args);
 
+	//! \brief Reset ArgoDSM statistics on all cluster nodes
+	//!
+	//! This call ensures all cluster nodes reset the ArgoDSM statistics
+	//! by performing an ArgoDSM release operation followed by a
+	//! statistics reset call.
+	static void argoResetStats();
+
 	static bool getDisableRemote()
 	{
 		assert(_singleton != nullptr);

@@ -37,6 +37,11 @@ extern "C" int nanos6_get_namespace_is_enabled(void)
 	return ClusterManager::getDisableRemote() == false;
 }
 
+extern "C" void nanos6_argo_reset_stats(void)
+{
+	ClusterManager::argoResetStats();
+}
+
 
 extern "C" void *nanos6_dmalloc(
 	size_t size,
