@@ -7,6 +7,7 @@
 #include "ClusterManager.hpp"
 #include "messages/MessageSysFinish.hpp"
 #include "messages/MessageDataFetch.hpp"
+#include "messages/MessageArgoResetStats.hpp"
 
 #include "messenger/Messenger.hpp"
 #include "polling-services/ClusterServicesPolling.hpp"
@@ -21,7 +22,9 @@
 #include "MessageId.hpp"
 
 #include "executors/workflow/cluster/ExecutionWorkflowCluster.hpp"
+#include "lowlevel/EnvironmentVariable.hpp"
 
+#include <argo/argo.hpp>
 
 TaskOffloading::RemoteTasksInfoMap *TaskOffloading::RemoteTasksInfoMap::_singleton = nullptr;
 ClusterManager *ClusterManager::_singleton = nullptr;
@@ -255,4 +258,28 @@ void ClusterManager::fetchVector(
 	ClusterPollingServices::PendingQueue<DataTransfer>::addPendingVector(temporal);
 
 	_singleton->_msn->sendMessage(msg, remoteNode);
+}
+
+void ClusterManager::argoResetStats()
+{
+	// Only perform this if in Cluster mode with ArgoDSM communicator
+	ConfigVariable<std::string> commType("cluster.communication");
+	if (inClusterMode() && commType.getValue() == "argodsm") {
+		ClusterNode *current = getCurrentClusterNode();
+		std::vector<ClusterNode *> const &world = getClusterNodes();
+		MessageArgoResetStats msg(current);
+
+		// Send an ArgoDSM statistics reset message to all nodes
+		for (ClusterNode *node : world) {
+			if (node == current) {
+				continue;
+			}
+
+			ClusterManager::sendMessage(&msg, node, true);
+		}
+
+		// Perform the release and stat reset ourselves
+		argo::backend::release();
+		argo::backend::reset_stats();
+	}
 }
