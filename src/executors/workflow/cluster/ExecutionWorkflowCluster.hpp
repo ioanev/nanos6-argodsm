@@ -333,7 +333,8 @@ namespace ExecutionWorkflow {
 		DataTransfer::data_transfer_callback_t _postcallback;
 		
 		bool _simpleDependencies;
-		bool _simpleAcquireDone;
+		bool _fullAcquire;
+		bool _fullAcquireDone;
 
 	public:
 		ArgoAcquireStep(
@@ -380,229 +381,39 @@ namespace ExecutionWorkflow {
 		}
 	};
 
-	class ArgoReleaseStepLocal : public DataReleaseStep {
-		//DataAccess *_dataAccess;
+
+	class ArgoReleaseStep : public Step {
 		bool _simpleDependencies;
-		bool _simpleReleaseDone;
+		bool _fullRelease;
 
-		public:
-			ArgoReleaseStepLocal(
-					Task *task
-					) : DataReleaseStep(task)
-			{
-				task->setDataReleaseStep(this);
-				ConfigVariable<bool> simpleDependencies("argodsm.simple_dependencies");
-				_simpleDependencies = simpleDependencies;
-				_simpleReleaseDone = false;
-			}
-
-			void addAccess(DataAccess *access)
-			{
-				//printf("[%d] ArgoReleaseStepLocal::addAccess: %zu\n",
-				//		nanos6_get_cluster_node_id(),
-				//		access->getAccessRegion().getSize());
-				_bytesToRelease += access->getAccessRegion().getSize();
-			}
-
-			void releaseRegion(
-					DataAccessRegion const &region,
-					WriteID writeID,
-					MemoryPlace const *location) override
-			{
-				//printf("[%d] ARSL::ReleaseRegion releasing (%p, %zu).\n",
-				//		nanos6_get_cluster_node_id(),
-				//		region.getStartAddress(), region.getSize());
-
-				/**
-				 * Perform the ArgoDSM selective_release
-				 */
-				if(_simpleDependencies) {
-					if(!_simpleReleaseDone) {
-						argo::backend::release();
-						_simpleReleaseDone = true;
-					}
-				}else{
-					//printf("[%d] ARSL::releaseRegion() performing selective_release(%p, %zu)\n",
-					//		nanos6_get_cluster_node_id(),
-					//		region.getStartAddress(),
-					//		region.getSize());
-					argo::backend::selective_release(region.getStartAddress(), region.getSize());
-				}
-
-				// Deleting this at any point seems to make the code stall, so for
-				// now we live with this possible leak. Deleting here only is unsafe
-				// as not all ArgoReleasStepLocal calls perform release.
-				//_bytesToRelease -= region.getSize();
-				//if (_bytesToRelease == 0) {
-				//	delete this;
-				//}
-			}
-			
-			bool checkDataRelease(DataAccess const *access) override
-			{
-				Task *task = access->getOriginator();
-
-				const bool mustWait = task->mustDelayRelease() && !task->allChildrenHaveFinished();
-
-				const bool releases = ( (access->getObjectType() == taskwait_type) // top level sink
-						|| !access->hasSubaccesses()) // or no fragments (i.e. no subtask to wait for)
-					&& task->hasFinished()     // must have finished; i.e. not taskwait inside task
-					&& access->readSatisfied() && access->writeSatisfied()
-					&& task->hasCode()
-					&& (task->getParent() != nullptr)
-					&& access->complete()                       // access must be complete
-					&& !access->hasDataLinkStep()
-					&& !mustWait;
-
-				Instrument::logMessage(
-						Instrument::ThreadInstrumentationContext::getCurrent(),
-						"Checking ArgoReleaseLocal access:", access->getInstrumentationId(),
-						" object_type:", access->getObjectType(),
-						" spawned originator:", access->getOriginator()->isSpawned(),
-						" read:", access->readSatisfied(),
-						" write:", access->writeSatisfied(),
-						" complete:", access->complete(),
-						" has-next:", access->hasNext(),
-						" task finished:", task->hasFinished(),
-						" releases:", releases
-						);
-				//printf("[%d] ArgoReleaseLocalStep::checkDataRelease:\n", nanos6_get_cluster_node_id());
-				//printf("\thasCode: %d\t\n", task->hasCode());
-				//std::cout << "[" << nanos6_get_cluster_node_id() << "] ";
-				//if(releases) {
-				//	std::cout << "ASRL::CheckDataRelease is true." << std::endl;
-				//}else{
-				//	std::cout << ((access->getObjectType() == taskwait_type)
-				//			|| !access->hasSubaccesses()) << " ";
-				//	std::cout << task->hasFinished() << " ";
-				//	std::cout << access->readSatisfied() << " ";
-				//	std::cout << access->writeSatisfied() << " ";
-				//	/* std::cout << task->hasCode() << " "; */
-				//	std::cout << (task->getParent() != nullptr) << " ";
-				//	std::cout << access->complete() << " ";
-				//	std::cout << !access->hasDataLinkStep() << " ";
-				//	std::cout << !mustWait << std::endl;
-				//}
-					//std::cout << !access->hasNext() << " ";
-
-				return releases;
-			}
-
-			void start() override
-			{
-				releaseSuccessors();
-			}
-	};
-
-
-	class ArgoReleaseStep : public DataReleaseStep {
-		//! identifier of the remote task
-		void *_remoteTaskIdentifier;
-
-		//! the cluster node we need to notify
-		ClusterNode const *_offloader;
-		
-		bool _simpleDependencies;
-		bool _simpleReleaseDone;
+		DataAccessRegion const& _region;
 
 		public:
 			ArgoReleaseStep(
-				TaskOffloading::ClusterTaskContext *context, Task *task
-			) : DataReleaseStep(task),
-				_remoteTaskIdentifier(context->getRemoteIdentifier()),
-				_offloader(context->getRemoteNode())
+				DataAccessRegion const &region
+			) : Step(),
+				_region(region)
 			{
-				//printf("[%d] Creating ArgoReleaseStep.\n",
-				//		nanos6_get_cluster_node_id());
-				task->setDataReleaseStep(this);
 				ConfigVariable<bool> simpleDependencies("argodsm.simple_dependencies");
-				_simpleDependencies = simpleDependencies;
-				_simpleReleaseDone = false;
-			}
-			
-			void addAccess(DataAccess *access)
-			{
-				_bytesToRelease += access->getAccessRegion().getSize();
-			}
-
-			void releaseRegion(
-					DataAccessRegion const &region,
-					WriteID writeID,
-					MemoryPlace const *location) override
-			{
-				/*
-				 * location == nullptr means that the access was propagated in this node's
-				 * namespace rather than being released to the offloader. This means that
-				 * the RELEASE_ACCESS message should not be sent. This function is still
-				 * called so that the workflow step can be deleted once all accesses are
-				 * accounted for.
-				 */
-				if (location != nullptr) {
-					Instrument::logMessage(
-							Instrument::ThreadInstrumentationContext::getCurrent(),
-							"releasing remote region:", region
-							);
-
-					/**
-					 * Perform the ArgoDSM selective_release
-					 * TODO: Does this need to be outside the if statement?
-					 */
-					if(_simpleDependencies) {
-						if(!_simpleReleaseDone) {
-							argo::backend::release();
-							_simpleReleaseDone = true;
-						}
-					}else{
-						//printf("[%d] ARS::releaseRegion() performing selective_release(%p, %zu)\n",
-						//		nanos6_get_cluster_node_id(),
-						//		region.getStartAddress(),
-						//		region.getSize());
-						argo::backend::selective_release(region.getStartAddress(), region.getSize());
-					}
-					TaskOffloading::sendRemoteAccessRelease(
-							_remoteTaskIdentifier, _offloader, region, writeID, location
-							);
-				}
-
-				_bytesToRelease -= region.getSize();
-				if (_bytesToRelease == 0) {
-					delete this;
-				}
-			}
-
-			bool checkDataRelease(DataAccess const *access) override
-			{
-				Task *task = access->getOriginator();
-
-				const bool mustWait = task->mustDelayRelease() && !task->allChildrenHaveFinished();
-
-				const bool releases = ( (access->getObjectType() == taskwait_type) // top level sink
-						|| !access->hasSubaccesses()) // or no fragments (i.e. no subtask to wait for)
-					&& task->hasFinished()     // must have finished; i.e. not taskwait inside task
-					&& access->readSatisfied() && access->writeSatisfied()
-					&& access->getOriginator()->isRemoteTask()  // only offloaded tasks: necessary (e.g. otherwise taskwait on will release)
-					&& access->complete()                       // access must be complete
-					&& !access->hasNext()                       // no next access at the remote side
-					&& !mustWait;
-
-				Instrument::logMessage(
-						Instrument::ThreadInstrumentationContext::getCurrent(),
-						"Checking DataRelease access:", access->getInstrumentationId(),
-						" object_type:", access->getObjectType(),
-						" spawned originator:", access->getOriginator()->isSpawned(),
-						" read:", access->readSatisfied(),
-						" write:", access->writeSatisfied(),
-						" complete:", access->complete(),
-						" has-next:", access->hasNext(),
-						" task finished:", task->hasFinished(),
-						" releases:", releases
-						);
-				return releases;
+				ConfigVariable<bool> fullRelease("argodsm.full_release");
+				_simpleDependencies = simpleDependencies.getValue();
+				_fullRelease = fullRelease.getValue();
 			}
 
 			void start() override
 			{
+				//! Perform the ArgoDSM release
+				if(_simpleDependencies || _fullRelease) {
+					argo::backend::release();
+					//! Avoiding repeated releases is filtered in the
+					//! task workflow creation.
+				}else{
+					argo::backend::selective_release(
+							_region.getStartAddress(),
+							_region.getSize());
+				}
 				releaseSuccessors();
+				delete this;
 			}
 	};
 

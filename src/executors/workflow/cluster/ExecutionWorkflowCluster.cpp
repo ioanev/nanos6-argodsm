@@ -225,8 +225,6 @@ namespace ExecutionWorkflow {
 		// TODO: If this condition never trigers then the _writeID member can be removed. from this
 		// class.
 		
-		//printf("[%d] ClusterDataCopyStep::requiresDataFetch() checking if fetch is needed: ",
-		//		nanos6_get_cluster_node_id());
 		if (!_needsTransfer) {
 			//! This access doesn't need a transfer.
 			//! We need to perform the data access registration if it is
@@ -239,20 +237,17 @@ namespace ExecutionWorkflow {
 					_isTaskwait
 				);
 			}
-			//printf("NO - !needsTransfer\n");
 			releaseSuccessors();
 			delete this;
 			return false;
 		}
 
 		if (WriteIDManager::checkWriteIDLocal(_writeID, _fullRegion)) {
-			//printf("NO - local writer ID\n");
 			releaseSuccessors();
 			delete this;
 			return false;
 		}
 
-		//printf("YES\n");
 		// Now check pending data transfers because the same data transfer
 		// (or one fully containing it) may already be pending. An example
 		// would be when several tasks with an "in" dependency on the same
@@ -371,50 +366,10 @@ namespace ExecutionWorkflow {
 	{
 		// ArgoDSM specifics
 		ConfigVariable<bool> simpleDependencies("argodsm.simple_dependencies");
-		_simpleDependencies = simpleDependencies;
-		_simpleAcquireDone = false;
-		
-		//printf("[%d] Creating ArgoAcquireStep for (%p, %zu).\n",
-		//		nanos6_get_cluster_node_id(),
-		//		_fullRegion.getStartAddress(),
-		//		_fullRegion.getSize());
-		
-		// We fragment the transfers here.
-		// TODO: If this affects performance, we can do the fragmentation on demand.
-		// So only when the fragmentation is goinf to take place.
-		//_nFragments = ClusterManager::getMPIFragments(region);
-
-		//char *start = (char *)region.getStartAddress();
-
-		//for (size_t i = 0; start < region.getEndAddress(); ++i) {
-
-		//	assert(i < _nFragments);
-		//	char *end = (char *) region.getEndAddress();
-
-		//	char *tmp = start + ClusterManager::getMessageMaxSize();
-		//	if (tmp < end) {
-		//		end = tmp;
-		//	}
-
-		//	_regionsFragments.push_back(DataAccessRegion(start, end));
-
-		//	start = tmp;
-		//}
-
-		//_postcallback = [&]() {
-		//	if (--_nFragments == 0) {
-		//		//! If this data copy is performed for a taskwait we don't need to update the
-		//		//! location here.
-		//		DataAccessRegistration::updateTaskDataAccessLocation(
-		//			_task,
-		//			_fullRegion,
-		//			_targetMemoryPlace,
-		//			_isTaskwait
-		//		);
-		//		this->releaseSuccessors();
-		//		delete this;
-		//	}
-		//};
+		ConfigVariable<bool> fullAcquire("argodsm.full_acquire");
+		_simpleDependencies = simpleDependencies.getValue();
+		_fullAcquire = fullAcquire.getValue();
+		_fullAcquireDone = false;
 	}
 
 
@@ -427,11 +382,6 @@ namespace ExecutionWorkflow {
 		// TODO: If this condition never trigers then the _writeID member can be removed. from this
 		// class.
 		
-		//printf("[%d] AAS::requiresDataFetch(%p, %zu) (TW: %d) checking if fetch is needed for: ",
-		//		nanos6_get_cluster_node_id(),
-		//		_fullRegion.getStartAddress(),
-		//		_fullRegion.getSize(),
-		//		_isTaskwait);
 		if (!_needsTransfer) {
 			//! This access doesn't need a transfer.
 			//! We need to perform the data access registration if it is
@@ -444,30 +394,24 @@ namespace ExecutionWorkflow {
 					_isTaskwait
 				);
 			}
-			//printf("NO - !needsTransfer\n");
 			releaseSuccessors();
 			delete this;
 			return false;
 		}
 
 		if (WriteIDManager::checkWriteIDLocal(_writeID, _fullRegion)) {
-			//printf("NO - local writer ID\n");
 			releaseSuccessors();
 			delete this;
 			return false;
 		}
 
-		//printf("YES\n");
-
 		// Perform Argo acquire or selective acquire
-		if(_simpleDependencies && !_simpleAcquireDone){
+		// TODO: This should probably be async
+		if((_simpleDependencies || _fullAcquire) &&
+				!_fullAcquireDone){
 			argo::backend::acquire();
-			_simpleAcquireDone = true;
+			_fullAcquireDone = true;
 		}else{
-			//printf("[%d] performing selective_acquire(%p, %zu)\n",
-			//		nanos6_get_cluster_node_id(),
-			//		_fullRegion.getStartAddress(),
-			//		_fullRegion.getSize());
 			argo::backend::selective_acquire(
 					_fullRegion.getStartAddress(),
 					_fullRegion.getSize());
