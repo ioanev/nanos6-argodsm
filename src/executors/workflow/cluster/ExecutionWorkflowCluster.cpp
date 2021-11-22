@@ -571,20 +571,6 @@ namespace ExecutionWorkflow {
 				locationIndex = location->getIndex();
 			}
 
-			/* Perform the ArgoDSM release operation */
-			if(_simpleDependencies) {
-				if(!_simpleReleaseDone) {
-					argo::backend::release();
-					_simpleReleaseDone = true;
-				}
-			}else{
-				//printf("[%d] ArgoDataLinkstep::LinkRegion() performing selective_release(%p, %zu)\n",
-				//	nanos6_get_cluster_node_id(),
-				//	region.getStartAddress(),
-				//	region.getSize());
-				argo::backend::selective_release(region.getStartAddress(), region.getSize());
-			}
-
 			// namespacePredecessor is in principle irrelevant, because it only matters when the
 			// task is created, not when a satisfiability message is sent (which is what is
 			// happening now). Nevertheless, this only happens when propagation does not happen
@@ -664,20 +650,6 @@ namespace ExecutionWorkflow {
 			// assert(_sourceMemoryPlace->getIndex() == _sourceMemoryPlace->getCommIndex());
 			execStep->addDataLink(location, _region, _writeID, _read, _write, (void *)_namespacePredecessor);
 
-			// Perform the ArgoDSM release operation
-			if(_simpleDependencies) {
-				if(!_simpleReleaseDone) {
-					argo::backend::release();
-					_simpleReleaseDone = true;
-				}
-			}else{
-				//printf("[%d] ArgoDataLinkStep::start() performing selective_release(%p, %zu)\n",
-				//	nanos6_get_cluster_node_id(),
-				//	_region.getStartAddress(),
-				//	_region.getSize());
-				argo::backend::selective_release(_region.getStartAddress(), _region.getSize());
-			}
-
 			const size_t linkedBytes = _region.getSize();
 			//! If at the moment of offloading the access is not both
 			//! read and write satisfied, then the info will be linked
@@ -694,6 +666,10 @@ namespace ExecutionWorkflow {
 			// Release successors before releasing the lock (otherwise
 			// ClusterDataLinkStep::linkRegion may delete this step first).
 			releaseSuccessors();
+		}
+
+		if(deleteStep) {
+			delete this;
 		}
 	}
 };

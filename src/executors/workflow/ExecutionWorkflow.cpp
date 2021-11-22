@@ -126,10 +126,30 @@ namespace ExecutionWorkflow {
 		/* Check if memory belongs to ArgoDSM and launch relevant ArgoDSM step. */
 		ConfigVariable<std::string> commType("cluster.communication");
 		if(commType.getValue() == "argodsm"){
-			if(task->isRemoteTask()) {
-				return new ArgoReleaseStep(task->getClusterContext(), task);
-			}else{
-				return new ArgoReleaseStepLocal(task);
+			//If any task access is argo memory
+			bool is_argo_task = false;
+			TaskDataAccesses &accessStruct = task->getDataAccesses();
+
+			accessStruct._lock.lock();
+			accessStruct._accesses.processAll(
+					[&](TaskDataAccesses::accesses_t::iterator position) -> bool {
+					DataAccess *dataAccess = &(*position);
+					assert(dataAccess != nullptr);
+
+					void *address = dataAccess->getAccessRegion().getStartAddress();
+					if(argo::is_argo_address(address)){
+						is_argo_task = true;
+					}
+					return true;
+			});
+			accessStruct._lock.unlock();
+			if(is_argo_task){
+				if(task->isRemoteTask()) {
+					return new ArgoReleaseStep(task->getClusterContext(), task);
+				}else{
+					printf("[%d] Creating ArgoReleaseStepLocal.\n", nanos6_get_cluster_node_id());
+					return new ArgoReleaseStepLocal(task);
+				}
 			}
 		}
 
@@ -137,6 +157,7 @@ namespace ExecutionWorkflow {
 			return new ClusterDataReleaseStep(task->getClusterContext(), task);
 		}
 
+		printf("[%d] Creating DataReleaseStep.\n", nanos6_get_cluster_node_id());
 		return new DataReleaseStep(task);
 	}
 
