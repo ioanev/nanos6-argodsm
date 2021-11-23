@@ -354,18 +354,19 @@ namespace ExecutionWorkflow {
 					!fullReleaseDone){
 					DataAccessRegion const &region = dataAccess->getAccessRegion();
 
-					//! TODO: Find out why filtering out READ_ACCESS_TYPE
-					//! impacts correctness.
-					Step *argoReleaseStep = new ArgoReleaseStep(region);
+					//! TODO: Check if this filtering actually works.
+					if(dataAccess->getType() != READ_ACCESS_TYPE){
+						Step *argoReleaseStep = new ArgoReleaseStep(region);
 
-					//! Ensure this step is run after execution but before the
-					//! general releaseStep
-					workflow->enforceOrder(executionStep, argoReleaseStep);
-					workflow->enforceOrder(argoReleaseStep, releaseStep);
+						//! Ensure this step is run after execution but before the
+						//! general releaseStep
+						workflow->enforceOrder(executionStep, argoReleaseStep);
+						workflow->enforceOrder(argoReleaseStep, releaseStep);
 
-					//! Skip performing multiple full (node-wide) releases
-					if(simpleDependencies.getValue() || fullRelease.getValue()){
-						fullReleaseDone = true;
+						//! Skip performing multiple full (node-wide) releases
+						if(simpleDependencies.getValue() || fullRelease.getValue()){
+							fullReleaseDone = true;
+						}
 					}
 				}
 				return true;
