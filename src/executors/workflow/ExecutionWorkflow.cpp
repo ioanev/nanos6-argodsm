@@ -342,6 +342,7 @@ namespace ExecutionWorkflow {
 			ConfigVariable<std::string> commType("cluster.communication");
 			ConfigVariable<bool> simpleDependencies("argodsm.simple_dependencies");
 			ConfigVariable<bool> fullRelease("argodsm.full_release");
+			ConfigVariable<bool> weakRelease("argodsm.weak_release");
 			bool singleRelease = fullRelease.getValue() || simpleDependencies.getValue();
 
 			//! Iterate over all data accesses and create one ArgoReleaseStep
@@ -355,10 +356,12 @@ namespace ExecutionWorkflow {
 					//! performed a simple (node-wide) release, create an
 					//! ArgoReleaseStep for the access region
 					//! We can skip this for weak tasks, as weak tasks do
-					//! not themselves perform any writes
+					//! not themselves perform any writes, or for strong
+					//! task if the weak_release optimisation is enabled
 					if (ClusterManager::inClusterMode() &&
 						commType.getValue() == "argodsm" &&
-						!dataAccess->isWeak()){
+						((!dataAccess->isWeak() && !weakRelease.getValue()) ||
+						 (dataAccess->isWeak() && weakRelease.getValue()))){
 						DataAccessRegion const &region = dataAccess->getAccessRegion();
 
 						//! Skip performing multiple full (node-wide) releases

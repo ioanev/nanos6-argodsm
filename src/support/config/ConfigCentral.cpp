@@ -37,6 +37,7 @@ void ConfigCentral::initialize()
 	registerOption<bool_t>("argodsm.simple_dependencies", false);
 	registerOption<bool_t>("argodsm.full_release", false);
 	registerOption<bool_t>("argodsm.full_acquire", false);
+	registerOption<bool_t>("argodsm.weak_release", false);
 
 	// CPU manager
 	registerOption<string_t>("cpumanager.policy", "default");

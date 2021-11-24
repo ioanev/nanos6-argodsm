@@ -292,6 +292,12 @@ __require_CLUSTER
 	# Enable full (node-wide) acquire fences irrespective of simple dependencies.
 	# Note that simple dependencies overrides this setting.
 	full_acquire = false
+	# If enabled, strong accesses will not forcefully propagate writes, and will
+	# need to be wrapped in tasks with corresponding weak accesses AND include a
+	# taskwait that waits for all strong accesses. Deferred propagation of writes
+	# can improve performance in the case where a task with large weak dependencies
+	# spawn tasks with finer grained strong dependencies to perform the actual work.
+	weak_release = false
 
 __!require_CLUSTER
 
