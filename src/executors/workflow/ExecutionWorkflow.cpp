@@ -337,7 +337,7 @@ namespace ExecutionWorkflow {
 		ConfigVariable<std::string> commType("cluster.communication");
 		ConfigVariable<bool> simpleDependencies("argodsm.simple_dependencies");
 		ConfigVariable<bool> fullRelease("argodsm.full_release");
-		bool fullReleaseDone = false;
+		bool singleRelease = fullRelease.getValue() || simpleDependencies.getValue();
 
 		//! Iterate over all data accesses and create one ArgoReleaseStep
 		//! for each access unless full (node-wide) acquire is selected
@@ -350,9 +350,22 @@ namespace ExecutionWorkflow {
 				//! performed a simple (node-wide) release, create an
 				//! ArgoReleaseStep for the access region
 				if (ClusterManager::inClusterMode() &&
-					commType.getValue() == "argodsm" &&
-					!fullReleaseDone){
+					commType.getValue() == "argodsm"){
 					DataAccessRegion const &region = dataAccess->getAccessRegion();
+
+					//! Skip performing multiple full (node-wide) releases
+					if(singleRelease){
+						Step *argoReleaseStep = new ArgoReleaseStep(region);
+
+						//! Ensure this step is run after execution but before the
+						//! general releaseStep
+						workflow->enforceOrder(executionStep, argoReleaseStep);
+						workflow->enforceOrder(argoReleaseStep, releaseStep);
+
+						//! Return false so that we avoid processing any
+						//! further data accesses, only one release is needed
+						return false;
+					}
 
 					//! TODO: Check if this filtering actually works.
 					if(dataAccess->getType() != READ_ACCESS_TYPE){
@@ -362,11 +375,6 @@ namespace ExecutionWorkflow {
 						//! general releaseStep
 						workflow->enforceOrder(executionStep, argoReleaseStep);
 						workflow->enforceOrder(argoReleaseStep, releaseStep);
-
-						//! Skip performing multiple full (node-wide) releases
-						if(simpleDependencies.getValue() || fullRelease.getValue()){
-							fullReleaseDone = true;
-						}
 					}
 				}
 				return true;
