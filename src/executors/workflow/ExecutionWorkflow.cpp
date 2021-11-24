@@ -334,52 +334,61 @@ namespace ExecutionWorkflow {
 
 		//! Create the ArgoReleaseStep to ensure that all dirty pages are
 		//! propagated to their respective homenodes
-		ConfigVariable<std::string> commType("cluster.communication");
-		ConfigVariable<bool> simpleDependencies("argodsm.simple_dependencies");
-		ConfigVariable<bool> fullRelease("argodsm.full_release");
-		bool singleRelease = fullRelease.getValue() || simpleDependencies.getValue();
+		//! We do this only for the tasks that will execute user code, or
+		//! in other words the tasks that run in local memory places
+		if(task->hasMemoryPlace() &&
+			ClusterManager::isLocalMemoryPlace(task->getMemoryPlace())){
 
-		//! Iterate over all data accesses and create one ArgoReleaseStep
-		//! for each access unless full (node-wide) acquire is selected
-		DataAccessRegistration::processAllDataAccesses(
-			task,
-			[&](DataAccess *dataAccess) -> bool {
-				assert(dataAccess != nullptr);
+			ConfigVariable<std::string> commType("cluster.communication");
+			ConfigVariable<bool> simpleDependencies("argodsm.simple_dependencies");
+			ConfigVariable<bool> fullRelease("argodsm.full_release");
+			bool singleRelease = fullRelease.getValue() || simpleDependencies.getValue();
 
-				//! If this is an ArgoDSM access, and we have not yet
-				//! performed a simple (node-wide) release, create an
-				//! ArgoReleaseStep for the access region
-				if (ClusterManager::inClusterMode() &&
-					commType.getValue() == "argodsm"){
-					DataAccessRegion const &region = dataAccess->getAccessRegion();
+			//! Iterate over all data accesses and create one ArgoReleaseStep
+			//! for each access unless full (node-wide) acquire is selected
+			DataAccessRegistration::processAllDataAccesses(
+				task,
+				[&](DataAccess *dataAccess) -> bool {
+					assert(dataAccess != nullptr);
 
-					//! Skip performing multiple full (node-wide) releases
-					if(singleRelease){
-						Step *argoReleaseStep = new ArgoReleaseStep(region);
+					//! If this is an ArgoDSM access, and we have not yet
+					//! performed a simple (node-wide) release, create an
+					//! ArgoReleaseStep for the access region
+					//! We can skip this for weak tasks, as weak tasks do
+					//! not themselves perform any writes
+					if (ClusterManager::inClusterMode() &&
+						commType.getValue() == "argodsm" &&
+						!dataAccess->isWeak()){
+						DataAccessRegion const &region = dataAccess->getAccessRegion();
 
-						//! Ensure this step is run after execution but before the
-						//! general releaseStep
-						workflow->enforceOrder(executionStep, argoReleaseStep);
-						workflow->enforceOrder(argoReleaseStep, releaseStep);
+						//! Skip performing multiple full (node-wide) releases
+						if(singleRelease){
+							Step *argoReleaseStep = new ArgoReleaseStep(region);
 
-						//! Return false so that we avoid processing any
-						//! further data accesses, only one release is needed
-						return false;
+							//! Ensure this step is run after execution but before the
+							//! general releaseStep
+							workflow->enforceOrder(executionStep, argoReleaseStep);
+							workflow->enforceOrder(argoReleaseStep, releaseStep);
+
+							//! Return false so that we avoid processing any
+							//! further data accesses, only one release is needed
+							return false;
+						}
+
+						//! TODO: Check if this filtering actually works.
+						if(dataAccess->getType() != READ_ACCESS_TYPE){
+							Step *argoReleaseStep = new ArgoReleaseStep(region);
+
+							//! Ensure this step is run after execution but before the
+							//! general releaseStep
+							workflow->enforceOrder(executionStep, argoReleaseStep);
+							workflow->enforceOrder(argoReleaseStep, releaseStep);
+						}
 					}
-
-					//! TODO: Check if this filtering actually works.
-					if(dataAccess->getType() != READ_ACCESS_TYPE){
-						Step *argoReleaseStep = new ArgoReleaseStep(region);
-
-						//! Ensure this step is run after execution but before the
-						//! general releaseStep
-						workflow->enforceOrder(executionStep, argoReleaseStep);
-						workflow->enforceOrder(argoReleaseStep, releaseStep);
-					}
+					return true;
 				}
-				return true;
-			}
-		);
+			);
+		}
 
 		DataAccessRegistration::processAllDataAccesses(
 			task,
