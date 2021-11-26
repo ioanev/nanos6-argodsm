@@ -565,7 +565,7 @@ namespace ExecutionWorkflow {
 				//! access, if the access is not read-only
 			 	(objectType == access_type)
 				&& (type != WRITE_ACCESS_TYPE)
-			); //TODO: Check if these conditions are correct for Argo
+			);
 
 		// If the memory address belongs to ArgoDSM memory space,
 		// perform an Argo step instead of a Nanos6 step
