@@ -381,28 +381,31 @@ namespace ExecutionWorkflow {
 		assert(_sourceMemoryPlace != _targetMemoryPlace);
 		// TODO: If this condition never trigers then the _writeID member can be removed. from this
 		// class.
-		
-		if (!_needsTransfer) {
-			//! This access doesn't need a transfer.
-			//! We need to perform the data access registration if it is
-			//! a non-weak output access. Otherwise there is nothing to do.
-			if (!_isTaskwait && !_isWeak) {
-				DataAccessRegistration::updateTaskDataAccessLocation(
-					_task,
-					_fullRegion,
-					_targetMemoryPlace,
-					_isTaskwait
-				);
-			}
-			releaseSuccessors();
-			delete this;
-			return false;
-		}
 
-		if (WriteIDManager::checkWriteIDLocal(_writeID, _fullRegion)) {
-			releaseSuccessors();
-			delete this;
-			return false;
+		// Do not optimize away acquire under simple dependencies
+		if(!_simpleDependencies){
+			if (!_needsTransfer) {
+				//! This access doesn't need a transfer.
+				//! We need to perform the data access registration if it is
+				//! a non-weak output access. Otherwise there is nothing to do.
+				if (!_isTaskwait && !_isWeak) {
+					DataAccessRegistration::updateTaskDataAccessLocation(
+							_task,
+							_fullRegion,
+							_targetMemoryPlace,
+							_isTaskwait
+							);
+				}
+				releaseSuccessors();
+				delete this;
+				return false;
+			}
+
+			if (WriteIDManager::checkWriteIDLocal(_writeID, _fullRegion)) {
+				releaseSuccessors();
+				delete this;
+				return false;
+			}
 		}
 
 		// Perform Argo acquire or selective acquire
