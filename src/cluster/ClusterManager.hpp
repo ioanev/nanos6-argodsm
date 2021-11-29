@@ -11,6 +11,7 @@
 #include <cassert>
 #include <string>
 #include <vector>
+#include <mutex>
 
 #include "cluster/messenger/Messenger.hpp"
 #include "cluster/messenger/DataTransfer.hpp"
@@ -57,6 +58,9 @@ private:
 	bool _disableAutowait;
 
 	size_t _messageMaxSize;
+
+	double releaseCreationTime;
+	std::mutex timer_mutex;
 
 	//! The ShutdownCallback for this ClusterNode.
 	//! At the moment this is an atomic variable, because we might have
@@ -418,6 +422,15 @@ public:
 		return (totalSize + maxRegionSize - 1) / maxRegionSize;
 	}
 
+	static void incrementReleaseCreationTime(const double time){
+		std::lock_guard<std::mutex> timer_lock(_singleton->timer_mutex);
+		_singleton->releaseCreationTime += time;
+	}
+
+	static double getReleaseCreationTime() {
+		std::lock_guard<std::mutex> timer_lock(_singleton->timer_mutex);
+		return _singleton->releaseCreationTime;
+	}
 };
 
 

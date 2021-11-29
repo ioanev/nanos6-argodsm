@@ -176,6 +176,9 @@ void ClusterManager::shutdownPhase1()
 					_singleton->_msn->sendMessage(&msg, slaveNode, true);
 				}
 			}
+			printf("[%d] Time spent creating release steps: %f\n",
+					nanos6_get_cluster_node_id(),
+					_singleton->getReleaseCreationTime());
 
 			_singleton->_msn->synchronizeAll();
 		}

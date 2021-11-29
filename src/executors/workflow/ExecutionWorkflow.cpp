@@ -24,6 +24,7 @@
 #include <ExecutionWorkflowCluster.hpp>
 #include <ClusterManager.hpp>
 #include <InstrumentDependencySubsystemEntryPoints.hpp>
+#include <mpi.h>
 
 namespace ExecutionWorkflow {
 
@@ -332,14 +333,16 @@ namespace ExecutionWorkflow {
 		workflow->enforceOrder(executionStep, releaseStep);
 		workflow->enforceOrder(releaseStep, notificationStep);
 
+		ConfigVariable<std::string> commType("cluster.communication");
+		double t1 = MPI_Wtime();
 		//! Create the ArgoReleaseStep to ensure that all dirty pages are
 		//! propagated to their respective homenodes
 		//! We do this only for the tasks that will execute user code, or
 		//! in other words the tasks that run in local memory places
 		if(task->hasMemoryPlace() &&
-			ClusterManager::isLocalMemoryPlace(task->getMemoryPlace())){
+			ClusterManager::isLocalMemoryPlace(task->getMemoryPlace()) &&
+			commType.getValue() == "argodsm"){
 
-			ConfigVariable<std::string> commType("cluster.communication");
 			ConfigVariable<bool> simpleDependencies("argodsm.simple_dependencies");
 			ConfigVariable<bool> fullRelease("argodsm.full_release");
 			ConfigVariable<bool> weakRelease("argodsm.weak_release");
@@ -359,7 +362,6 @@ namespace ExecutionWorkflow {
 					//! not themselves perform any writes, or for strong
 					//! task if the weak_release optimisation is enabled
 					if (ClusterManager::inClusterMode() &&
-						commType.getValue() == "argodsm" &&
 						((!dataAccess->isWeak() && !weakRelease.getValue()) ||
 						 (dataAccess->isWeak() && weakRelease.getValue()))){
 						DataAccessRegion const &region = dataAccess->getAccessRegion();
@@ -392,6 +394,8 @@ namespace ExecutionWorkflow {
 				}
 			);
 		}
+		double t2 = MPI_Wtime();
+		ClusterManager::incrementReleaseCreationTime(t2-t1);
 
 		DataAccessRegistration::processAllDataAccesses(
 			task,
