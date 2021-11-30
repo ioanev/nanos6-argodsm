@@ -20,11 +20,13 @@
 #include <InstrumentInstrumentationContext.hpp>
 #include <InstrumentThreadInstrumentationContext.hpp>
 
+#include <mpi.h>
 
 namespace ExecutionWorkflow {
 
 	void HostExecutionStep::start()
 	{
+		double t1 = MPI_Wtime();
 		WorkerThread *currentThread = WorkerThread::getCurrentWorkerThread();
 		CPU *cpu = (currentThread == nullptr) ? nullptr : currentThread->getComputePlace();
 		Task *currentTask = (currentThread == nullptr) ? nullptr : currentThread->getTask();
@@ -119,6 +121,8 @@ namespace ExecutionWorkflow {
 
 		// Release the subsequent steps
 		_task->setExecutionStep(nullptr);
+		double t2 = MPI_Wtime();
+		ClusterManager::incrementHostExecutionStep(t2-t1);
 		releaseSuccessors();
 		delete this;
 	}

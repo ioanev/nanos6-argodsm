@@ -24,6 +24,7 @@
 #include <DataAccessRegistration.hpp>
 
 #include <argo/argo.hpp>
+#include <mpi.h>
 
 class ComputePlace;
 class MemoryPlace;
@@ -402,6 +403,7 @@ namespace ExecutionWorkflow {
 
 			void start() override
 			{
+				double t1 = MPI_Wtime();
 				//! Perform the ArgoDSM release
 				if(_simpleDependencies || _fullRelease) {
 					argo::backend::release();
@@ -412,6 +414,8 @@ namespace ExecutionWorkflow {
 							_region.getStartAddress(),
 							_region.getSize());
 				}
+				double t2 = MPI_Wtime();
+				ClusterManager::incrementArgoReleaseStep(t2-t1);
 				releaseSuccessors();
 				delete this;
 			}

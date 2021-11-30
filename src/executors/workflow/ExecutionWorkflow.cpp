@@ -147,7 +147,10 @@ namespace ExecutionWorkflow {
 					continue;
 				}
 
+				double t1 = MPI_Wtime();
 				acquireStep->requiresDataFetch();
+				double t2 = MPI_Wtime();
+				ClusterManager::incrementArgoRequiresDataFetch(t2-t1);
 			}
 			return;
 		}
@@ -166,6 +169,7 @@ namespace ExecutionWorkflow {
 			// It is a copy step, so group them respect to destination
 			// requiresDataFetch will inmediately release successors when
 			// (!_needsTransfer && !_isTaskwait)
+			double t1 = MPI_Wtime();
 			if (clusterCopy->requiresDataFetch()) {
 				assert(clusterCopy->getTargetMemoryPlace()
 					== ClusterManager::getCurrentMemoryNode());
@@ -175,8 +179,11 @@ namespace ExecutionWorkflow {
 				fragments[source] += clusterCopy->getNumFragments();
 				groups[source].push_back(clusterCopy);
 			}
+			double t2 = MPI_Wtime();
+			ClusterManager::incrementMpiRequiresDataFetch(t2-t1);
 		}
 
+		double t1 = MPI_Wtime();
 		for (auto const& it : groups) {
 			MemoryPlace const* source = it.first;
 
@@ -189,6 +196,8 @@ namespace ExecutionWorkflow {
 
 			ClusterManager::fetchVector(fragments[source], it.second, source);
 		}
+		double t2 = MPI_Wtime();
+		ClusterManager::incrementMpiRequiresDataFetch(t2-t1);
 	}
 
 
@@ -328,17 +337,12 @@ namespace ExecutionWorkflow {
 
 		/* TODO: Once we have correct management for the Task symbols here
 			* we should create the corresponding allocation steps. */
-
-		double t1 = MPI_Wtime();
 		DataReleaseStep *releaseStep = workflow->createDataReleaseStep(task);
-		double t2 = MPI_Wtime();
-		ClusterManager::incrementDataReleaseCreationTime(t2-t1);
 
 		workflow->enforceOrder(executionStep, releaseStep);
 		workflow->enforceOrder(releaseStep, notificationStep);
 
 		ConfigVariable<std::string> commType("cluster.communication");
-		t1 = MPI_Wtime();
 		//! Create the ArgoReleaseStep to ensure that all dirty pages are
 		//! propagated to their respective homenodes
 		//! We do this only for the tasks that will execute user code, or
@@ -398,10 +402,7 @@ namespace ExecutionWorkflow {
 				}
 			);
 		}
-		t2 = MPI_Wtime();
-		ClusterManager::incrementArgoReleaseCreationTime(t2-t1);
 
-		t1 = MPI_Wtime();
 		DataAccessRegistration::processAllDataAccesses(
 			task,
 			[&](DataAccess *dataAccess) -> bool {
@@ -453,8 +454,6 @@ namespace ExecutionWorkflow {
 				return true;
 			}
 		);
-		t2 = MPI_Wtime();
-		ClusterManager::incrementDataCopyCreationTime(t2-t1);
 
 		if (executionStep->ready()) {
 			workflow->enforceOrder(executionStep, notificationStep);

@@ -59,10 +59,11 @@ private:
 
 	size_t _messageMaxSize;
 
-	double argoReleaseCreationTime;
-	double dataReleaseCreationTime;
-	double dataCopyCreationTime;
 	std::mutex timer_mutex;
+	double argoReleaseStepTime;
+	double hostExecutionStepTime;
+	double mpiRequiresDataFetchTime;
+	double argoRequiresDataFetchTime;
 
 	//! The ShutdownCallback for this ClusterNode.
 	//! At the moment this is an atomic variable, because we might have
@@ -424,34 +425,52 @@ public:
 		return (totalSize + maxRegionSize - 1) / maxRegionSize;
 	}
 
-	static void incrementArgoReleaseCreationTime(const double time){
+	static void incrementArgoReleaseStep(const double time){
 		std::lock_guard<std::mutex> timer_lock(_singleton->timer_mutex);
-		_singleton->argoReleaseCreationTime += time;
+		_singleton->argoReleaseStepTime += time;
 	}
 
-	static double getArgoReleaseCreationTime() {
+	static double getArgoReleaseStep() {
 		std::lock_guard<std::mutex> timer_lock(_singleton->timer_mutex);
-		return _singleton->argoReleaseCreationTime;
+		return _singleton->argoReleaseStepTime;
 	}
 
-	static void incrementDataReleaseCreationTime(const double time){
+	static void incrementHostExecutionStep(const double time){
 		std::lock_guard<std::mutex> timer_lock(_singleton->timer_mutex);
-		_singleton->dataReleaseCreationTime += time;
+		_singleton->hostExecutionStepTime += time;
 	}
 
-	static double getDataReleaseCreationTime() {
+	static double getHostExecutionStep() {
 		std::lock_guard<std::mutex> timer_lock(_singleton->timer_mutex);
-		return _singleton->dataReleaseCreationTime;
+		return _singleton->hostExecutionStepTime;
 	}
 
-	static void incrementDataCopyCreationTime(const double time){
+	static void incrementMpiRequiresDataFetch(const double time){
 		std::lock_guard<std::mutex> timer_lock(_singleton->timer_mutex);
-		_singleton->dataCopyCreationTime += time;
+		_singleton->mpiRequiresDataFetchTime += time;
 	}
 
-	static double getDataCopyCreationTime() {
+	static double getMpiRequiresDataFetch() {
 		std::lock_guard<std::mutex> timer_lock(_singleton->timer_mutex);
-		return _singleton->dataCopyCreationTime;
+		return _singleton->mpiRequiresDataFetchTime;
+	}
+
+	static void incrementArgoRequiresDataFetch(const double time){
+		std::lock_guard<std::mutex> timer_lock(_singleton->timer_mutex);
+		_singleton->argoRequiresDataFetchTime += time;
+	}
+
+	static double getArgoRequiresDataFetch() {
+		std::lock_guard<std::mutex> timer_lock(_singleton->timer_mutex);
+		return _singleton->argoRequiresDataFetchTime;
+	}
+
+	static void reset_stats() {
+		std::lock_guard<std::mutex> timer_lock(_singleton->timer_mutex);
+		_singleton->argoReleaseStepTime       = 0.0;
+		_singleton->hostExecutionStepTime     = 0.0;
+		_singleton->mpiRequiresDataFetchTime  = 0.0;
+		_singleton->argoRequiresDataFetchTime = 0.0;
 	}
 };
 

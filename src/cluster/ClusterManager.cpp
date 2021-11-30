@@ -176,15 +176,18 @@ void ClusterManager::shutdownPhase1()
 					_singleton->_msn->sendMessage(&msg, slaveNode, true);
 				}
 			}
-			printf("[%d] Time spent creating argo release steps: %f\n",
+			printf("[%d] Time spent in argo release step: %f\n",
 					nanos6_get_cluster_node_id(),
-					_singleton->getArgoReleaseCreationTime());
-			printf("[%d] Time spent creating data release steps: %f\n",
+					_singleton->getArgoReleaseStep());
+			printf("[%d] Time spent in host execution step: %f\n",
 					nanos6_get_cluster_node_id(),
-					_singleton->getDataReleaseCreationTime());
-			printf("[%d] Time spent creating data copy steps: %f\n",
+					_singleton->getHostExecutionStep());
+			printf("[%d] Time spent in mpi requires data fetch: %f\n",
 					nanos6_get_cluster_node_id(),
-					_singleton->getDataCopyCreationTime());
+					_singleton->getMpiRequiresDataFetch());
+			printf("[%d] Time spent in argo requires data fetch: %f\n",
+					nanos6_get_cluster_node_id(),
+					_singleton->getArgoRequiresDataFetch());
 
 			_singleton->_msn->synchronizeAll();
 		}
@@ -290,5 +293,6 @@ void ClusterManager::argoResetStats()
 		// Perform the release and stat reset ourselves
 		argo::backend::release();
 		argo::backend::reset_stats();
+		ClusterManager::reset_stats();
 	}
 }

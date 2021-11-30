@@ -5,6 +5,7 @@
 */
 
 #include "MessageArgoResetStats.hpp"
+#include "ClusterManager.hpp"
 
 #include <argo/argo.hpp>
 #include "lowlevel/EnvironmentVariable.hpp"
@@ -21,6 +22,7 @@ bool MessageArgoResetStats::handleMessage()
 		argo::backend::release();		//Empty write buffers
 		argo::backend::reset_stats();	//Reset statistics
 	}
+	ClusterManager::reset_stats();
 	return true;
 }
 
