@@ -59,7 +59,9 @@ private:
 
 	size_t _messageMaxSize;
 
-	double releaseCreationTime;
+	double argoReleaseCreationTime;
+	double dataReleaseCreationTime;
+	double dataCopyCreationTime;
 	std::mutex timer_mutex;
 
 	//! The ShutdownCallback for this ClusterNode.
@@ -422,14 +424,34 @@ public:
 		return (totalSize + maxRegionSize - 1) / maxRegionSize;
 	}
 
-	static void incrementReleaseCreationTime(const double time){
+	static void incrementArgoReleaseCreationTime(const double time){
 		std::lock_guard<std::mutex> timer_lock(_singleton->timer_mutex);
-		_singleton->releaseCreationTime += time;
+		_singleton->argoReleaseCreationTime += time;
 	}
 
-	static double getReleaseCreationTime() {
+	static double getArgoReleaseCreationTime() {
 		std::lock_guard<std::mutex> timer_lock(_singleton->timer_mutex);
-		return _singleton->releaseCreationTime;
+		return _singleton->argoReleaseCreationTime;
+	}
+
+	static void incrementDataReleaseCreationTime(const double time){
+		std::lock_guard<std::mutex> timer_lock(_singleton->timer_mutex);
+		_singleton->dataReleaseCreationTime += time;
+	}
+
+	static double getDataReleaseCreationTime() {
+		std::lock_guard<std::mutex> timer_lock(_singleton->timer_mutex);
+		return _singleton->dataReleaseCreationTime;
+	}
+
+	static void incrementDataCopyCreationTime(const double time){
+		std::lock_guard<std::mutex> timer_lock(_singleton->timer_mutex);
+		_singleton->dataCopyCreationTime += time;
+	}
+
+	static double getDataCopyCreationTime() {
+		std::lock_guard<std::mutex> timer_lock(_singleton->timer_mutex);
+		return _singleton->dataCopyCreationTime;
 	}
 };
 

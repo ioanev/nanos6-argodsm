@@ -176,9 +176,15 @@ void ClusterManager::shutdownPhase1()
 					_singleton->_msn->sendMessage(&msg, slaveNode, true);
 				}
 			}
-			printf("[%d] Time spent creating release steps: %f\n",
+			printf("[%d] Time spent creating argo release steps: %f\n",
 					nanos6_get_cluster_node_id(),
-					_singleton->getReleaseCreationTime());
+					_singleton->getArgoReleaseCreationTime());
+			printf("[%d] Time spent creating data release steps: %f\n",
+					nanos6_get_cluster_node_id(),
+					_singleton->getDataReleaseCreationTime());
+			printf("[%d] Time spent creating data copy steps: %f\n",
+					nanos6_get_cluster_node_id(),
+					_singleton->getDataCopyCreationTime());
 
 			_singleton->_msn->synchronizeAll();
 		}

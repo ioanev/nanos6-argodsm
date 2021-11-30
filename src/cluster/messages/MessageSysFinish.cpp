@@ -22,9 +22,15 @@ bool MessageSysFinish::handleMessage()
 		"Master node received a MessageSysFinish; this should never happen."
 	);
 
-	printf("[%d] Time spent creating release steps: %f\n",
+	printf("[%d] Time spent creating argo release steps: %f\n",
 			nanos6_get_cluster_node_id(),
-			ClusterManager::getReleaseCreationTime());
+			ClusterManager::getArgoReleaseCreationTime());
+	printf("[%d] Time spent creating data release steps: %f\n",
+			nanos6_get_cluster_node_id(),
+			ClusterManager::getDataReleaseCreationTime());
+	printf("[%d] Time spent creating data copy steps: %f\n",
+			nanos6_get_cluster_node_id(),
+			ClusterManager::getDataCopyCreationTime());
 	ClusterShutdownCallback *callback = nullptr;
 	do {
 		//! We will spin to avoid the (not very likely) case that the Callback has not been set
