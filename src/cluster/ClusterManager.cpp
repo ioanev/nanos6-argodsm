@@ -40,7 +40,7 @@ ClusterManager::ClusterManager()
 	_callback(nullptr)
 {
 	_clusterNodes[0] = _thisNode;
-	WriteIDManager::initialize(0,1);
+	WriteIDManager::initialize(0,1);		
 }
 
 ClusterManager::ClusterManager(std::string const &commType)
@@ -57,6 +57,9 @@ ClusterManager::ClusterManager(std::string const &commType)
 	const size_t clusterSize = _msn->getClusterSize();
 	const int nodeIndex = _msn->getNodeIndex();
 	const int masterIndex = _msn->getMasterIndex();
+
+	for (int i = 0; i < clusterSize; ++i)
+		offloads.push_back(0);
 
 	MessageId::initialize(nodeIndex, clusterSize);
 	WriteIDManager::initialize(nodeIndex, clusterSize);
@@ -188,6 +191,11 @@ void ClusterManager::shutdownPhase1()
 			printf("[%d] Time spent in argo requires data fetch: %f\n",
 					nanos6_get_cluster_node_id(),
 					_singleton->getArgoRequiresDataFetch());
+			printf("[%d] Offloaded tasks: [", nanos6_get_cluster_node_id());
+			for (int i = 0; i < ClusterManager::clusterSize(); ++i) {
+				printf("%zu ", _singleton->getNodeOffloads(i));
+			}
+			printf("]\n");
 
 			_singleton->_msn->synchronizeAll();
 		}

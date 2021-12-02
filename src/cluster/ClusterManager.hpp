@@ -64,6 +64,7 @@ private:
 	double hostExecutionStepTime;
 	double mpiRequiresDataFetchTime;
 	double argoRequiresDataFetchTime;
+	std::vector<size_t> offloads;
 
 	//! The ShutdownCallback for this ClusterNode.
 	//! At the moment this is an atomic variable, because we might have
@@ -463,6 +464,14 @@ public:
 	static double getArgoRequiresDataFetch() {
 		std::lock_guard<std::mutex> timer_lock(_singleton->timer_mutex);
 		return _singleton->argoRequiresDataFetchTime;
+	}
+
+	static void incrementNodeOffloads(int index) {
+		_singleton->offloads[index] += 1;
+	}
+
+	static size_t getNodeOffloads(int index) {
+		return _singleton->offloads[index];
 	}
 
 	static void reset_stats() {

@@ -34,6 +34,11 @@ bool MessageSysFinish::handleMessage()
 	printf("[%d] Time spent in argo requires data fetch: %f\n",
 			nanos6_get_cluster_node_id(),
 			ClusterManager::getArgoRequiresDataFetch());
+	printf("[%d] Offloaded tasks: [", nanos6_get_cluster_node_id());
+	for (int i = 0; i < ClusterManager::clusterSize(); ++i) {
+		printf("%zu ", ClusterManager::getNodeOffloads(i));
+	}
+	printf("]\n");
 	ClusterShutdownCallback *callback = nullptr;
 	do {
 		//! We will spin to avoid the (not very likely) case that the Callback has not been set

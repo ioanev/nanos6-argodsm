@@ -139,5 +139,7 @@ int ClusterLocalityScheduler::getScheduledNode(
 		nodeId = std::distance(it, std::max_element(it, it + clusterSize));
 	}
 
+	ClusterManager::incrementNodeOffloads(nodeId);
+
 	return nodeId;
 }
