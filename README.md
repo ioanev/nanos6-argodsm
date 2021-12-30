@@ -440,7 +440,12 @@ For more information on how to write and run cluster applications see [Cluster.m
 - `argodsm.distributed_memory="16G"`
 - `argodsm.cache_size="4G"`
 
-`argo.distributed_memory` dictates the amount of memory ArgoDSM will reserve on the system in bytes, divided equally among all nodes. The ArgoDSM page cache resides in memory on each cluster node, and with very large distributed memory sizes, `argo.cache_size` can be used to request an ArgoDSM cache size smaller than the default value equal to the distributed memory size. For additional configuration variables see [Cluster.md](docs/cluster/Cluster.md).
+`argo.distributed_memory` dictates the amount of memory ArgoDSM will reserve on the system in bytes, divided equally among all nodes. The ArgoDSM page cache resides in memory on each cluster node, and with very large distributed memory sizes, `argo.cache_size` can be used to request an ArgoDSM cache size smaller than the default value equal to the distributed memory size.
+
+The ArgoDSM communicator uses coherence fences to ensure that data is coherent between tasks. By default, both the acquire and release fences used are *selective*, meaning that fine-grained coherence fences are issued as needed for each memory region and task. In some instances it may be favourable to instruct ArgoDSM to use one *full* coherence fence instead of multiple selective fences per task, in particular when tasks have large in- or out dependencies but in reality only touch a portion of the data. Full coherence fences can be enabled by setting either of the following configuration variables to `true`.
+
+- `argodsm.full_acquire = true`
+- `argodsm.full_release = true`
 
 ArgoDSM provides experimental support for *simple dependencies*, where *sentinels* representing a larger data structure or a set of data can be used to control concurrency between tasks without specifying a full list of dependencies.
 ```
@@ -453,7 +458,9 @@ When sentinels are used instead of full dependencies, the runtime system can nei
 - `argodsm.simple_dependencies=true`
 - `cluster.scheduling_policy="random"`
 
-Depending on the system configuration, it may also be necessary to disable *address space layout randomization* (ASLR). It is recommended to execute Nanos6-ArgoDSM applications through mpirun or mpiexec. In order to execute a Nanos6-ArgoDSM application compiled with Mercurium on four nodes with ASLR disabled, execute the following:
+For additional configuration variables see [Cluster.md](docs/cluster/Cluster.md).
+
+Finally, depending on the system configuration, it may also be necessary to disable *address space layout randomization* (ASLR). It is recommended to execute Nanos6-ArgoDSM applications through mpirun or mpiexec. In order to execute a Nanos6-ArgoDSM application compiled with Mercurium on four nodes with ASLR disabled, execute the following:
 ```
 $ setarch $(uname -m) -R mpirun -n 4 ./application
 ```
