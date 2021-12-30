@@ -134,9 +134,20 @@ int ClusterLocalityScheduler::getScheduledNode(
 	if(ft_bytes > locality_tuning*max_bytes) {
 		nodeId = getNextFtNode();
 	} else {
-		std::vector<size_t>::iterator it = bytes.begin();
-		// TODO: Should we pick getNextFtNode() if all distances are equal?
-		nodeId = std::distance(it, std::max_element(it, it + clusterSize));
+		// If each node has an equal amount of bytes stored locally,
+		// offload to the "next" node instead of always defaulting
+		// to node 0.
+		if ( std::adjacent_find( bytes.begin(), bytes.end(),
+					std::not_equal_to<>() ) == bytes.end() ) {
+			// All elements are equal, pick getNextFtNode()
+			nodeId = getNextFtNode();
+		}
+		// Otherwise, pick the node with the most amount of bytes
+		// stored locally.
+		else {
+			std::vector<size_t>::iterator it = bytes.begin();
+			nodeId = std::distance(it, std::max_element(it, it + clusterSize));
+		}
 	}
 
 	ClusterManager::incrementNodeOffloads(nodeId);
