@@ -390,6 +390,12 @@ public:
 	//! statistics reset call.
 	static void argoResetStats();
 
+	//! \brief Call an ArgoDSM upgrade writers barrier on all cluster nodes
+
+	//! This call ensures all cluster nodes upgrade the classification of
+	//! pages with at least on writer to shared.
+	static void argoUpgradeWriters();
+
 	static bool getDisableRemote()
 	{
 		assert(_singleton != nullptr);

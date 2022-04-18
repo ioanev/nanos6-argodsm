@@ -8,6 +8,7 @@
 #include "messages/MessageSysFinish.hpp"
 #include "messages/MessageDataFetch.hpp"
 #include "messages/MessageArgoResetStats.hpp"
+#include "messages/MessageArgoUpgradeWriters.hpp"
 
 #include "messenger/Messenger.hpp"
 #include "polling-services/ClusterServicesPolling.hpp"
@@ -281,5 +282,28 @@ void ClusterManager::argoResetStats()
 		// Perform the release and stat reset ourselves
 		argo::backend::release();
 		argo::backend::reset_stats();
+	}
+}
+
+void ClusterManager::argoUpgradeWriters()
+{
+	// Only perform this if in Cluster mode with ArgoDSM communicator
+	ConfigVariable<std::string> commType("cluster.communication");
+	if (inClusterMode() && commType.getValue() == "argodsm") {
+		ClusterNode *current = getCurrentClusterNode();
+		std::vector<ClusterNode *> const &world = getClusterNodes();
+		MessageArgoUpgradeWriters msg(current);
+
+		// Send an ArgoDSM classification upgrade message to all nodes
+		for (ClusterNode *node : world) {
+			if (node == current) {
+				continue;
+			}
+
+			ClusterManager::sendMessage(&msg, node, true);
+		}
+
+		// Perform the classification upgrade
+		argo::barrier_upgrade_writers();
 	}
 }

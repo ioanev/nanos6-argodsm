@@ -483,7 +483,8 @@ cluster_sources += \
 if USE_ARGODSM
 cluster_argo_sources = \
 	src/cluster/messenger/argo/ArgoMessenger.cpp \
-	src/cluster/messages/MessageArgoResetStats.cpp
+	src/cluster/messages/MessageArgoResetStats.cpp \
+	src/cluster/messages/MessageArgoUpgradeWriters.cpp
 endif
 cluster_sources += $(cluster_argo_sources)
 
@@ -1356,6 +1357,7 @@ noinst_HEADERS += \
 	src/cluster/messages/MessageTaskNew.hpp \
 	src/cluster/messages/MessageType.hpp \
 	src/cluster/messages/MessageArgoResetStats.hpp \
+	src/cluster/messages/MessageArgoUpgradeWriters.hpp \
 	src/cluster/messenger/DataTransfer.hpp \
 	src/cluster/messenger/Messenger.hpp \
 	src/cluster/messenger/argo/ArgoDataTransfer.hpp \

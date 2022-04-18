@@ -61,6 +61,9 @@ int nanos6_get_namespace_is_enabled(void);
 //! \brief Reset the ArgoDSM statistics for each node
 void nanos6_argo_reset_stats(void);
 
+//! \brief Upgrade the ArgoDSM classification for each node
+void nanos6_argo_upgrade_writers(void);
+
 //! \brief Allocate distributed memory
 //!
 //! Distributed memory is a clsuter type of memory that can only be

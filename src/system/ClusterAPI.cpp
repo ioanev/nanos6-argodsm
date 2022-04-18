@@ -42,6 +42,10 @@ extern "C" void nanos6_argo_reset_stats(void)
 	ClusterManager::argoResetStats();
 }
 
+extern "C" void nanos6_argo_upgrade_writers(void)
+{
+	ClusterManager::argoUpgradeWriters();
+}
 
 extern "C" void *nanos6_dmalloc(
 	size_t size,

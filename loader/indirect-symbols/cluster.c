@@ -86,6 +86,18 @@ void nanos6_argo_reset_stats(void)
 	return (*symbol)();
 }
 
+void nanos6_argo_upgrade_writers(void)
+{
+	typedef void nanos6_argo_upgrade_writers_t(void);
+
+	static nanos6_argo_upgrade_writers_t *symbol = NULL;
+	if (__builtin_expect(symbol == NULL, 0)) {
+		symbol = (nanos6_argo_upgrade_writers_t *) _nanos6_resolve_symbol(
+				"nanos6_argo_upgrade_writers", "cluster", NULL);
+	}
+
+	return (*symbol)();
+}
 
 void *nanos6_dmalloc(size_t size, nanos6_data_distribution_t policy,
 		size_t num_dimensions, size_t *dimensions)
